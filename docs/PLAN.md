@@ -1,14 +1,12 @@
 ---
-PLAN: "feat: appkit server — BuildServer/RunServer joining httpd, rpc, MCP (closed by default) and /_routes, deny by default"
+PLAN: "feat: appkit server (deny by default, rpc, closed MCP, /_routes) and menu from view.Screen (permission per screen, groups only with a visible child)"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
-SESSION: 12620570444179125109
 ---
 
 > Read AGENTS.md at the repo root before any change.
 
-# PLAN — `appkit`, slice 1: the server
+# PLAN — `appkit`, slice 1: the server and the menu from `view.Screen`
 
 ## Why
 
@@ -18,13 +16,13 @@ libraries once; an app only configures it. This slice moves **only the server** 
 permissions and first admin come in later plans). The source is in `_temp/` (reference only):
 `_temp/mjosefa-cms/config/{server.go,dev.go,prod.go,mcp.go,routes.go}`,
 `_temp/mjosefa-cms/tests/{api_surface_test.go,setup_test.go,app_security_test.go}`,
-`_temp/iam/config/server.go`.
+`_temp/iam/config/server.go`, `_temp/device_manager/ui/browser.go`.
 
 ## Tools
 
 ```
 go install webtyp.com/devflow/cmd/gotest@latest
-go get webtyp.com/env@v0.1.0 webtyp.com/events@v0.1.0 webtyp.com/fmt@v1.0.0 webtyp.com/mcp@v0.3.4 webtyp.com/model@v0.2.6 webtyp.com/orm@v0.12.10 webtyp.com/postgres@v0.4.16 webtyp.com/router@v0.4.6 webtyp.com/rpc@v0.2.3 webtyp.com/server@v0.2.86 webtyp.com/unixid@v0.3.1
+go get webtyp.com/env@v0.1.0 webtyp.com/events@v0.1.0 webtyp.com/fmt@v1.0.0 webtyp.com/mcp@v0.3.4 webtyp.com/model@v0.2.6 webtyp.com/orm@v0.12.10 webtyp.com/postgres@v0.4.16 webtyp.com/router@v0.4.6 webtyp.com/rpc@v0.2.3 webtyp.com/server@v0.2.86 webtyp.com/unixid@v0.3.1 webtyp.com/view@v0.6.44 webtyp.com/layout@v0.3.70 webtyp.com/dom@v0.13.29 webtyp.com/lang@v0.1.9
 ```
 
 ## Ecosystem search
@@ -120,9 +118,55 @@ and `httptest.NewServer(handler)` from `srv.Handler()`:
 | `TestIntrospectionListsRPCRoutes` | dev build | `GET /_routes` → 200, lists a route starting with `/api/` |
 | `TestRegisterMountsAppRoutes` | `Register` adds `GET /ping` `.Public()` | `GET /ping` → 200 |
 
-## Stage 4 — docs and cleanup
+## Stage 4 — `menu.go` (`//go:build browser`): screens → menu
 
-- `README.md`: what `appkit` is (one sentence), the `ServerConfig` table, and this example:
+Modules now declare their screens as data with `webtyp.com/view` v0.6.44 (`view.Screen`,
+`view.Lookup`, `Screen.Validate()` — read them with `go doc webtyp.com/view Screen`). `appkit`
+turns them into the menu modules `platformd` draws. Reference for the leaf construction and the
+lookup loading: `_temp/device_manager/ui/browser.go` (`onFirstActivation`, `fillOptions`).
+
+```go
+// Menu is what appkit hands to platformd: the modules and the visibility rule.
+type Menu struct {
+	Modules []platformd.UIModule
+	CanView func(id string) bool // for platformd.Platform.CanView
+}
+
+// BuildMenu validates every screen and builds its platformd module. allows answers whether the
+// signed-in user holds a permission (in an app: func(r model.Resource) bool { return profile.Allows(string(r)) }).
+func BuildMenu(screens []view.Screen, ids model.IDGenerator, allows func(model.Resource) bool) (Menu, error)
+```
+
+Rules (write them exactly):
+
+1. Call `s.Validate()` on every screen first; return its error unchanged.
+2. **Leaf** → `v, err := crudview.New(crudview.Config{ParentID: s.ID, Presenter: s.Presenter, IDs: ids})`;
+   module `platformd.NewUIModule(s.ID, lang.Translate(s.Label).String(), svg.Icon(s.Icon), v, activate)`
+   where `activate` is `onFirstActivation(v, load)` copied from the reference, and `load` runs
+   `fillOptions(v, l.Field, l.Source)` for each `l` in `s.Lookups`. If
+   `s.Presenter.Description() != ""`, wrap with `platformd.Describe(m, s.Presenter.Description())`.
+3. **Group** → `platformd.Describe(platformd.NewGroupUIModule(s.ID, lang.Translate(s.Label).String(), svg.Icon(s.Icon), children), s.Help)`
+   with `children` built by rule 2.
+4. **CanView**: a closure over a slice of `{id string; permission model.Resource}` pairs (no `map`:
+   this code ships to WASM) for every leaf: returns `allows(permission)` for a leaf id; returns
+   `false` for a group id and for unknown ids. `platformd` already shows a group only when one of its
+   children is viewable (`platformd.go` `isViewable`), so a group with no viewable child is hidden.
+
+## Stage 5 — menu tests (`tests/menu_test.go`, `//go:build browser`)
+
+Use `view.New(&conformance.FakeLister{}, &conformance.MockRecord{})` (`webtyp.com/view/conformance`)
+as presenters and `unixid`/a counter as `ids`.
+
+| Test | Setup | Expect |
+|---|---|---|
+| `TestBuildMenu_InvalidScreenIsAnError` | a leaf without `Permission` | error containing `needs a Permission` |
+| `TestBuildMenu_LeafVisibleByItsPermission` | leaf `x` with `Permission: "service"`; `allows` true only for `"service"` | `CanView("x")` true; with `allows` always false → false |
+| `TestBuildMenu_GroupHasNoOwnPermission` | group `g` with leaf `g.a` | `CanView("g")` false; one module returned, it implements `platformd.GroupModule` with 1 child |
+| `TestBuildMenu_DescriptionFromPresenter` | leaf whose presenter uses `view.WithDescription("Help")` | module implements `platformd.Described`, `Description() == "Help"` |
+
+## Stage 6 — docs and cleanup
+
+- `README.md`: what `appkit` is (one sentence), the `ServerConfig` table, a `BuildMenu` section (screens from modules → menu, permission per screen, groups hidden without a visible child), and this example:
 
 ```go
 // web/server/main.go of an app
@@ -154,4 +198,6 @@ GOPRIVATE=webtyp.com/*,github.com/veltylabs/* GOFLAGS=-mod=mod gotest
 | 1 | `server.go` | compiles; no `Providers`, no `network` |
 | 2 | `dev.go`, `prod.go` | `go vet -tags prod ./...` and default build pass |
 | 3 | `tests/*_test.go` | six tests pass |
-| 4 | `README.md`; delete `_temp/` | `test ! -e _temp` |
+| 4 | `menu.go` | `BuildMenu` builds leaves, groups and `CanView` |
+| 5 | `tests/menu_test.go` | four tests pass in the browser suite |
+| 6 | `README.md`; delete `_temp/` | `test ! -e _temp` |
