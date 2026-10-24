@@ -2,6 +2,8 @@
 PLAN: "feat: appkit server (deny by default, rpc, closed MCP, /_routes) and menu from view.Screen (permission per screen, groups only with a visible child)"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 10765143539541902424
 ---
 
 > Read AGENTS.md at the repo root before any change.
