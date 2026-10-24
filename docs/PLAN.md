@@ -2,6 +2,8 @@
 PLAN: "feat: appkit server — BuildServer/RunServer joining httpd, rpc, MCP (closed by default) and /_routes, deny by default"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 1612719599423145003
 ---
 
 > Read AGENTS.md at the repo root before any change.
