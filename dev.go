@@ -1,6 +1,6 @@
 //go:build !wasm && !prod
 
-package config
+package appkit
 
 import (
 	"webtyp.com/model"
@@ -12,12 +12,11 @@ func validateAuthorize(cfg ServerConfig) error {
 }
 
 // DevAllowAll provee un opt-in explícito para que desarrollo evite la autorización.
-// Ejemplo: cfg.Authorize = config.DevAllowAll()
 func DevAllowAll() model.Authorizer {
 	return func(userID string, resource model.Resource, action model.Action) bool {
 		return true
 	}
 }
 
-// introspectionAccess: en desarrollo /_routes es público (AS-8).
+// introspectionAccess: en desarrollo /_routes es público.
 func introspectionAccess(r router.Route) { r.Public() }

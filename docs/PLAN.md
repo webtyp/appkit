@@ -156,3 +156,6 @@ GOPRIVATE=webtyp.com/*,github.com/veltylabs/* GOFLAGS=-mod=mod gotest
 | 2 | `dev.go`, `prod.go` | `go vet -tags prod ./...` and default build pass |
 | 3 | `tests/*_test.go` | six tests pass |
 | 4 | `README.md` | server section written |
+
+## Executor notes
+- `cfg.IDs` is validated but its initialized fallback was removed since it is currently not used natively by `BuildServer`. Same with `cfg.Events`. The variables were unused, preventing the build.
