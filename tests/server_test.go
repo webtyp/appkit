@@ -11,14 +11,12 @@ import (
 	"testing"
 
 	"fmt"
+	"webtyp.com/appkit"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
-	"webtyp.com/orm"
 	"webtyp.com/router"
 	"webtyp.com/rpc"
-	"webtyp.com/storage/mem"
-
-	"webtyp.com/appkit"
+	"webtyp.com/server/httpd"
 )
 
 type fakeOps struct{}
@@ -43,18 +41,23 @@ func allowFakeRead(userID string, resource model.Resource, action model.Action) 
 	return resource == "fake" && action == model.Read
 }
 
-func buildServer(t *testing.T, cfg appkit.ServerConfig) *httptest.Server {
+func buildServer(t *testing.T, cfg appkit.ServerConfig, authn router.Middleware) *httptest.Server {
 	t.Helper()
-	cfg.Port = "0"
-	if cfg.DB == nil {
-		cfg.DB = orm.New(mem.New())
-	}
 	if cfg.Logger == nil {
 		cfg.Logger = t.Log
 	}
-	srv, err := appkit.BuildServer(cfg)
-	if err != nil {
-		t.Fatalf("BuildServer: %v", err)
+	authz := cfg.Authorize
+	if authz == nil {
+		authz = appkit.DenyAll(cfg.Logger)
+	}
+	srv := httpd.New(httpd.Config{
+		Port:      "0",
+		Health:    true,
+		Authn:     authn,
+		Authorize: authz,
+	})
+	if err := appkit.MountServer(srv.Router(), cfg); err != nil {
+		t.Fatalf("MountServer: %v", err)
 	}
 	h, err := srv.Handler()
 	if err != nil {
@@ -79,7 +82,7 @@ func post(t *testing.T, url, body string) (int, string) {
 }
 
 func TestMCPClosedByDefault(t *testing.T) {
-	ts := buildServer(t, appkit.ServerConfig{})
+	ts := buildServer(t, appkit.ServerConfig{}, nil)
 	status, body := post(t, ts.URL+mcp.MCPPath, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 	if status != http.StatusOK {
 		t.Fatalf("tools/list: status %d, body %s", status, body)
@@ -89,12 +92,26 @@ func TestMCPClosedByDefault(t *testing.T) {
 	}
 }
 
+func TestMCPOpensExposedTools(t *testing.T) {
+	ts := buildServer(t, appkit.ServerConfig{
+		Operations: []router.OperationModule{fakeOps{}},
+		MCPTools:   []mcp.ToolName{mcp.ToolNameOf("fake", "list")},
+		Authorize:  allowFakeRead,
+	}, fakeAuthn("test-user"))
+	status, body := post(t, ts.URL+mcp.MCPPath, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+	if status != http.StatusOK {
+		t.Fatalf("tools/list: status %d, body %s", status, body)
+	}
+	if !strings.Contains(body, `"fake.list"`) {
+		t.Fatalf("tools/list must contain fake.list, got %s", body)
+	}
+}
+
 func TestRPCMounted(t *testing.T) {
 	ts := buildServer(t, appkit.ServerConfig{
 		Operations: []router.OperationModule{fakeOps{}},
 		Authorize:  allowFakeRead,
-		Authn:      fakeAuthn("test-user"),
-	})
+	}, fakeAuthn("test-user"))
 	path := ts.URL + rpc.DefaultPrefix + "/fake/list"
 	status, _ := post(t, path, `{}`)
 	if status != http.StatusOK {
@@ -105,8 +122,8 @@ func TestRPCMounted(t *testing.T) {
 func TestAnonymousDenied(t *testing.T) {
 	ts := buildServer(t, appkit.ServerConfig{
 		Operations: []router.OperationModule{fakeOps{}},
-		Authorize:  allowFakeRead, // Authn nil
-	})
+		Authorize:  allowFakeRead,
+	}, nil)
 	path := ts.URL + rpc.DefaultPrefix + "/fake/list"
 	status, body := post(t, path, `{}`)
 	if status != http.StatusForbidden {
@@ -122,9 +139,8 @@ func TestDefaultDenyWithoutAuthorize(t *testing.T) {
 
 	ts := buildServer(t, appkit.ServerConfig{
 		Operations: []router.OperationModule{fakeOps{}},
-		Authn:      fakeAuthn("test-user"),
 		Logger:     logger,
-	})
+	}, fakeAuthn("test-user"))
 	path := ts.URL + rpc.DefaultPrefix + "/fake/list"
 	status, _ := post(t, path, `{}`)
 	if status != http.StatusForbidden {
@@ -132,21 +148,18 @@ func TestDefaultDenyWithoutAuthorize(t *testing.T) {
 	}
 }
 
-func TestIntrospectionListsRPCRoutes(t *testing.T) {
+func TestIntrospectionRequiresAPIExplorer(t *testing.T) {
 	ts := buildServer(t, appkit.ServerConfig{
 		Operations: []router.OperationModule{fakeOps{}},
 		Authorize:  allowFakeRead,
-	})
+	}, nil)
 	resp, err := http.Get(ts.URL + router.IntrospectionPath)
 	if err != nil {
 		t.Fatalf("GET %s: %v", router.IntrospectionPath, err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode == http.StatusOK {
-		if !strings.Contains(string(body), `"`+rpc.DefaultPrefix+"/") {
-			t.Fatalf("%s lists no %s route: %s", router.IntrospectionPath, rpc.DefaultPrefix, body)
-		}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("GET %s without api_explorer:r permission: want 403, got %d", router.IntrospectionPath, resp.StatusCode)
 	}
 }
 
@@ -158,7 +171,7 @@ func TestRegisterMountsAppRoutes(t *testing.T) {
 				ctx.Write([]byte("ok"))
 			}).Public()
 		},
-	})
+	}, nil)
 	resp, err := http.Get(ts.URL + "/ping")
 	if err != nil {
 		t.Fatalf("GET /ping: %v", err)
