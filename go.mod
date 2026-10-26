@@ -7,15 +7,9 @@ require (
 	webtyp.com/model v0.2.6
 	webtyp.com/router v0.4.8
 	webtyp.com/rpc v0.2.4
-	webtyp.com/server v0.2.93
 )
 
 require (
-	github.com/smallstep/truststore v0.13.0 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
-	howett.net/plist v1.0.0 // indirect
 	webtyp.com/base64 v0.0.6 // indirect
 	webtyp.com/calendar v0.1.0 // indirect
 	webtyp.com/context v0.0.23 // indirect
@@ -24,7 +18,6 @@ require (
 	webtyp.com/filepath v0.1.0 // indirect
 	webtyp.com/fmt v1.0.0 // indirect
 	webtyp.com/json v0.5.33 // indirect
-	webtyp.com/pwa v0.2.13 // indirect
 	webtyp.com/time v0.6.2 // indirect
 	webtyp.com/unixid v0.3.1 // indirect
 )
