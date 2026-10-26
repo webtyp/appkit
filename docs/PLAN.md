@@ -7,23 +7,21 @@ REVIEWER: none
 
 # PLAN — `appkit`, slice 2: the menu from `view.Screen`
 
-(Parked as `docs/PLAN_MENU.md` until slice 1, the server, merges; it then becomes `docs/PLAN.md`.)
-
 ## Tools
 
 ```
-go install webtyp.com/devflow/cmd/gotest@latest
-go get webtyp.com/view@v0.6.44 webtyp.com/layout@v0.3.70 webtyp.com/dom@v0.13.29 webtyp.com/lang@v0.1.9 webtyp.com/model@v0.2.6 webtyp.com/router@v0.4.6 webtyp.com/unixid@v0.3.1
+go install webtyp.com/devflow/cmd/gotest@latest webtyp.com/lang/cmd/langc@latest
+go get webtyp.com/view@v0.6.45 webtyp.com/layout@v0.3.75 webtyp.com/dom@v0.13.29 webtyp.com/lang@v0.1.10 webtyp.com/model@v0.2.6 webtyp.com/router@v0.4.8 webtyp.com/unixid@v0.3.1
 ```
 
 ## Ecosystem search
 
-`webtyp/layout` (`platformd`, `crudview`) draws screens; `webtyp/view` v0.6.44 declares them
+`webtyp/layout` (`platformd`, `crudview`) draws screens; `webtyp/view` v0.6.45 declares them
 (`view.Screen`). Nothing joins the two: **new** in `appkit`, importing both.
 
 ## Stage 1 — `menu.go` (`//go:build browser`): screens → menu
 
-Modules now declare their screens as data with `webtyp.com/view` v0.6.44 (`view.Screen`,
+Modules now declare their screens as data with `webtyp.com/view` v0.6.45 (`view.Screen`,
 `view.Lookup`, `Screen.Validate()` — read them with `go doc webtyp.com/view Screen`). `appkit`
 turns them into the menu modules `platformd` draws. Reference for the leaf construction and the
 lookup loading: `_temp/device_manager/ui/browser.go` (`onFirstActivation`, `fillOptions`).
@@ -55,6 +53,35 @@ Rules (write them exactly):
    `false` for a group id and for unknown ids. `platformd` already shows a group only when one of its
    children is viewable (`platformd.go` `isViewable`), so a group with no viewable child is hidden.
 
+Helper implementations for reference:
+
+```go
+func onFirstActivation(v *crudview.CrudView, load func()) func() {
+	loaded := false
+	return func() {
+		if !loaded {
+			loaded = true
+			load()
+		}
+		v.Activate()
+	}
+}
+
+func fillOptions(v *crudview.CrudView, field string, source view.Presenter) {
+	source.Reload(func(err error) {
+		if err != nil {
+			return
+		}
+		items := source.Items()
+		opts := make([]fmt.KeyValue, 0, len(items))
+		for _, it := range items {
+			opts = append(opts, fmt.KeyValue{Key: it.ID, Value: it.Label})
+		}
+		v.SetOptions(field, opts...)
+	})
+}
+```
+
 ## Stage 2 — menu tests (`tests/menu_test.go`, `//go:build browser`)
 
 Use `view.New(&conformance.FakeLister{}, &conformance.MockRecord{})` (`webtyp.com/view/conformance`)
@@ -69,6 +96,7 @@ as presenters and `unixid`/a counter as `ids`.
 
 ## Stage 3 — docs and cleanup
 
+- `langc sync .`: ensure 0 untranslated keys, 0 reuse warnings, 0 identical-value errors.
 - `README.md`: add a `BuildMenu` section (screens from modules → menu, permission per screen, groups hidden without a visible child), with a short `[]view.Screen` example.
 - Delete `_temp/`. Check: `test ! -e _temp`.
 
@@ -76,6 +104,7 @@ as presenters and `unixid`/a counter as `ids`.
 
 ```
 GOPRIVATE=webtyp.com/*,github.com/veltylabs/* GOFLAGS=-mod=mod gotest
+test ! -e _temp
 ```
 
 - A PR that does not compile, or whose tests could not run, is a failed delivery.
@@ -90,4 +119,4 @@ GOPRIVATE=webtyp.com/*,github.com/veltylabs/* GOFLAGS=-mod=mod gotest
 |---|---|---|
 | 1 | `menu.go` | `BuildMenu` builds leaves, groups and `CanView` |
 | 2 | `tests/menu_test.go` | four tests pass in the browser suite |
-| 3 | `README.md`; delete `_temp/` | `test ! -e _temp` |
+| 3 | `README.md`; delete `_temp/` | `test ! -e _temp` and `langc sync .` clean |
