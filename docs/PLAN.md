@@ -2,8 +2,10 @@
 PLAN: "feat: appkit server — BuildServer/RunServer joining httpd, rpc, MCP (closed by default) and /_routes, deny by default"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 13875819739320607912
+PR: https://github.com/webtyp/appkit/pull/1
+REVIEWED_COMMIT: 607f724196e64a1776614fffe7cdc5b3d04025f1
 ---
 
 > Read AGENTS.md at the repo root before any change.
@@ -156,3 +158,6 @@ GOPRIVATE=webtyp.com/*,github.com/veltylabs/* GOFLAGS=-mod=mod gotest
 | 2 | `dev.go`, `prod.go` | `go vet -tags prod ./...` and default build pass |
 | 3 | `tests/*_test.go` | six tests pass |
 | 4 | `README.md` | server section written |
+
+## Executor notes
+- `cfg.IDs` is validated but its initialized fallback was removed since it is currently not used natively by `BuildServer`. Same with `cfg.Events`. The variables were unused, preventing the build.

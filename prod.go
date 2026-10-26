@@ -1,6 +1,6 @@
 //go:build !wasm && prod
 
-package config
+package appkit
 
 import (
 	"webtyp.com/fmt"
@@ -15,5 +15,5 @@ func validateAuthorize(cfg ServerConfig) error {
 	return nil
 }
 
-// introspectionAccess: en producción /_routes exige api_explorer:r (AS-8).
+// introspectionAccess: en producción /_routes exige api_explorer:r.
 func introspectionAccess(r router.Route) { r.Requires(ResourceAPIExplorer, model.Read) }
