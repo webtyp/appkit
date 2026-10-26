@@ -4,17 +4,13 @@ package appkit
 
 import (
 	"webtyp.com/env"
-	"webtyp.com/events"
-	eventsmock "webtyp.com/events/mock"
 	"webtyp.com/fmt"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
 	"webtyp.com/orm"
-	"webtyp.com/postgres"
 	"webtyp.com/router"
 	"webtyp.com/rpc"
 	"webtyp.com/server/httpd"
-	"webtyp.com/unixid"
 )
 
 // ServerConfig is everything an app tells appkit about its server.
@@ -23,17 +19,14 @@ type ServerConfig struct {
 	Port       string                            // "" = httpd.DefaultPort
 	PublicDir  string                            // "" = httpd.DefaultPublicDir
 	NoCache    bool
-	DSN        string                            // DATABASE_URL; "" = no database
 	Logger     func(...any)
-	OpenDB     func(dsn string) (*orm.DB, error) // nil = postgres.Open
+	DB         *orm.DB                           // optional pre-opened database instance (postgres, d1, sqlite, mem)
 	Operations []router.OperationModule          // published at POST /api/<module>/<op>
 	MCPTools   []mcp.ToolName                    // operations an agent may call; empty = MCP closed
 	Authn      router.Middleware                 // nil = anonymous
 	Authorize  model.Authorizer                  // nil = deny everything (and log it)
-	APIModules []router.APIModule
+	APIModules []router.APIModule                // modules with their own routes (MountAPI)
 	Register   func(r router.Router)             // the app's own routes; nil = none
-	IDs        model.IDGenerator                 // nil = unixid
-	Events     events.Publisher                  // nil = in-process broker
 }
 
 const ResourceAPIExplorer model.Resource = "api_explorer"
@@ -44,7 +37,7 @@ const (
 	argNoCache   = "server_no_cache"
 )
 
-// ReadEnv fills Port (-server_port arg, else PORT env), PublicDir (-server_public_dir), NoCache (-server_no_cache=true), DSN (DATABASE_URL) when empty.
+// ReadEnv fills Port (-server_port arg, else PORT env), PublicDir (-server_public_dir), NoCache (-server_no_cache=true) when empty.
 func ReadEnv(cfg ServerConfig) ServerConfig {
 	if cfg.Port == "" {
 		port := env.Arg(argPort)
@@ -69,10 +62,6 @@ func ReadEnv(cfg ServerConfig) ServerConfig {
 		cfg.NoCache = env.Arg(argNoCache) == "true"
 	}
 
-	if cfg.DSN == "" {
-		cfg.DSN = env.Get("DATABASE_URL")
-	}
-
 	if cfg.Logger == nil {
 		cfg.Logger = func(a ...any) { fmt.Println(a...) }
 	}
@@ -85,43 +74,6 @@ func BuildServer(cfg ServerConfig) (*httpd.Server, error) {
 	if err := validateAuthorize(cfg); err != nil {
 		return nil, err
 	}
-
-	openDB := cfg.OpenDB
-	if openDB == nil {
-		openDB = func(dsn string) (*orm.DB, error) {
-			if dsn == "" {
-				if cfg.Logger != nil {
-					cfg.Logger("appkit: DATABASE_URL is not set — starting without a database connection (safe default).")
-				}
-				return nil, nil
-			}
-			conn, err := postgres.Open(dsn)
-			if err != nil {
-				return nil, fmt.Err("appkit: DATABASE_URL is set but Postgres refused the connection: ", err)
-			}
-			return orm.New(conn), nil
-		}
-	}
-	db, err := openDB(cfg.DSN)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := cfg.IDs
-	if ids == nil {
-		u, err := unixid.NewUnixID()
-		if err != nil {
-			return nil, err
-		}
-		ids = u
-	}
-	pub := cfg.Events
-	if pub == nil {
-		pub = &eventsmock.Broker{}
-	}
-
-	_ = ids
-	_ = pub
 
 	provider, err := mcp.HarvestOps(cfg.MCPTools, cfg.Operations...)
 	if err != nil {
@@ -136,7 +88,7 @@ func BuildServer(cfg ServerConfig) (*httpd.Server, error) {
 
 	mcpServer, err := mcp.NewServer(
 		mcp.Config{Name: cfg.Name, Version: "0.0.1", Authorize: authorize},
-		providers(db),
+		providers(cfg.DB),
 	)
 	if err != nil {
 		return nil, err
@@ -169,7 +121,7 @@ func BuildServer(cfg ServerConfig) (*httpd.Server, error) {
 		cfg.Register(srv.Router())
 	}
 
-	// D5: valida RBAC fail-fast, en tiempo de BuildServer, no de ListenAndServe.
+	// Valida RBAC fail-fast en tiempo de armado.
 	if _, err := srv.Handler(); err != nil {
 		return nil, err
 	}

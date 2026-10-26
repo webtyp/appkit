@@ -46,9 +46,8 @@ func allowFakeRead(userID string, resource model.Resource, action model.Action) 
 func buildServer(t *testing.T, cfg appkit.ServerConfig) *httptest.Server {
 	t.Helper()
 	cfg.Port = "0"
-	if cfg.OpenDB == nil {
-		db := orm.New(mem.New())
-		cfg.OpenDB = func(string) (*orm.DB, error) { return db, nil }
+	if cfg.DB == nil {
+		cfg.DB = orm.New(mem.New())
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = t.Log
@@ -118,7 +117,6 @@ func TestAnonymousDenied(t *testing.T) {
 func TestDefaultDenyWithoutAuthorize(t *testing.T) {
 	logger := func(a ...any) {
 		line := fmt.Sprint(a...)
-
 		t.Log(line)
 	}
 
