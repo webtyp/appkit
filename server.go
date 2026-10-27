@@ -21,8 +21,6 @@ type ServerConfig struct {
 	Logger     func(...any)
 }
 
-const ResourceAPIExplorer model.Resource = "api_explorer"
-
 // MountServer mounts the application contracts onto r.
 func MountServer(r router.Router, cfg ServerConfig) error {
 	authorize := cfg.Authorize
@@ -49,7 +47,7 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	}
 	mcpServer.MountAPI(r)
 
-	router.MountIntrospection(r, router.IntrospectionPath, cfg.Policy).Requires(ResourceAPIExplorer, model.Read)
+	router.MountIntrospection(r, router.IntrospectionPath, cfg.Policy).Requires(router.ResourceIntrospection, model.Read)
 
 	for _, m := range cfg.APIModules {
 		if m != nil {

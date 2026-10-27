@@ -20,7 +20,7 @@ AWS AppConfig).
 
 `MountServer(r router.Router, cfg ServerConfig) error` works on the `router.Router` **contract**, never on a
 concrete transport: it mounts rpc operations, the MCP server (only the tools named in `MCPTools`; empty =
-MCP closed), `/_routes` protected with `Requires(<introspection resource>, model.Read)` in every mode, the
+MCP closed), `/_routes` protected with `Requires(router.ResourceIntrospection, model.Read)` in every mode, the
 `APIModules`, and the app's own `Register(r)`. A nil `Authorize` becomes `DenyAll` (and logs every denial).
 
 It deliberately has no `httpd`, `env`, `dev.go` or `prod.go`: the concrete transport lives in `webtyp/server` (or

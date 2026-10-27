@@ -3,8 +3,10 @@ PLAN: "refactor: guard /_routes with router.ResourceIntrospection; delete appkit
 TAG: v0.0.5
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 9680790118507378019
+PR: https://github.com/webtyp/appkit/pull/2
+REVIEWED_COMMIT: 74fcb0890bb590b3c3189c4aff087473c4c93417
 ---
 
 > Read AGENTS.md at the repo root before any change.
