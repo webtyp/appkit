@@ -160,7 +160,20 @@ func TestIntrospectionRequiresAPIExplorer(t *testing.T) {
 	}, nil)
 	status, _ := get(r, router.IntrospectionPath)
 	if status != 403 {
-		t.Fatalf("GET %s without api_explorer:r permission: want 403, got %d", router.IntrospectionPath, status)
+		t.Fatalf("GET %s without router.ResourceIntrospection read permission: want 403, got %d", router.IntrospectionPath, status)
+	}
+}
+
+func TestIntrospectionOpensWithItsPermission(t *testing.T) {
+	r := buildRouter(t, appkit.ServerConfig{
+		Operations: []router.OperationModule{fakeOps{}},
+		Authorize: func(userID string, res model.Resource, a model.Action) bool {
+			return res == router.ResourceIntrospection && a == model.Read
+		},
+	}, fakeAuthn("test-user"))
+	status, _ := get(r, router.IntrospectionPath)
+	if status != 200 {
+		t.Fatalf("GET %s with router.ResourceIntrospection read permission: want 200, got %d", router.IntrospectionPath, status)
 	}
 }
 
