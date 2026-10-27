@@ -3,6 +3,8 @@ PLAN: "refactor: guard /_routes with router.ResourceIntrospection; delete appkit
 TAG: v0.0.5
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 9680790118507378019
 ---
 
 > Read AGENTS.md at the repo root before any change.
