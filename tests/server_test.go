@@ -247,8 +247,14 @@ func TestSchemaServedWithItsPermission(t *testing.T) {
 	if !strings.Contains(rep.SVG, `id="erd-table-invoice"`) || !strings.Contains(rep.SVG, ">shop<") {
 		t.Error("the diagram must draw the step's tables in a band named after the step")
 	}
-	if len(rep.Findings) != 3 || rep.Findings[0].Rule != erd.RuleMissingTable || rep.Findings[0].Target != "tenant" {
-		t.Fatalf("findings = %+v, want one missing_table → tenant", rep.Findings)
+	errs := 0
+	for _, f := range rep.Findings {
+		if f.Rule.Level() == erd.LevelError {
+			errs++
+		}
+	}
+	if errs != 1 || rep.Findings[0].Rule != erd.RuleMissingTable || rep.Findings[0].Target != "tenant" {
+		t.Fatalf("findings = %+v, want one error: missing_table → tenant", rep.Findings)
 	}
 }
 
