@@ -3,8 +3,10 @@ PLAN: "feat: ServerConfig.Migrations — GET /_schema serves the app's database 
 TAG: v0.0.7
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 13470001113254648269
+PR: https://github.com/webtyp/appkit/pull/3
+REVIEWED_COMMIT: 49fca9246a3f1a7529e8eb94d73c2dbe54e8d099
 ---
 
 > Read AGENTS.md at the repo root before any change.
