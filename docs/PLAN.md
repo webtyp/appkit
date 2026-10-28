@@ -3,6 +3,8 @@ PLAN: "feat: ServerConfig.Migrations — GET /_schema serves the app's database 
 TAG: v0.0.7
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 13470001113254648269
 ---
 
 > Read AGENTS.md at the repo root before any change.
