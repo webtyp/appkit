@@ -4,7 +4,7 @@ go 1.26.8
 
 require (
 	webtyp.com/mcp v0.3.9
-	webtyp.com/model v0.2.6
+	webtyp.com/model v0.2.8
 	webtyp.com/router v0.4.9
 	webtyp.com/rpc v0.2.4
 )
