@@ -6,6 +6,9 @@ import (
 
 	"fmt"
 	"webtyp.com/appkit"
+	"webtyp.com/ddl"
+	"webtyp.com/erd"
+	"webtyp.com/json"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -192,5 +195,73 @@ func TestRegisterMountsAppRoutes(t *testing.T) {
 	}
 	if body != "ok" {
 		t.Fatalf("GET /ping body: want 'ok', got %q", body)
+	}
+}
+
+type table struct {
+	name string
+	ref  string // foreign key column "ref_id" → ref, when not empty
+}
+
+func (t *table) ModelName() string { return t.name }
+func (t *table) Schema() []model.Field {
+	f := []model.Field{{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}}}
+	if t.ref != "" {
+		f = append(f, model.Field{Name: "ref_id", Type: model.Text()})
+	}
+	return f
+}
+func (t *table) SchemaExt() []model.FieldExt {
+	if t.ref == "" {
+		return nil
+	}
+	return []model.FieldExt{{Field: t.Schema()[1], Ref: t.ref}}
+}
+func (t *table) Pointers() []any                  { return nil }
+func (t *table) IsNil() bool                      { return t == nil }
+func (t *table) EncodeFields(_ model.FieldWriter) {}
+func (t *table) DecodeFields(_ model.FieldReader) {}
+
+var shopStep = ddl.Step{Name: "shop", Run: func(conn ddl.Execer, c ddl.Compiler) error {
+	d := ddl.New(conn, c)
+	if err := d.CreateTable(&table{name: "customer"}); err != nil {
+		return err
+	}
+	return d.CreateTable(&table{name: "invoice", ref: "tenant"})
+}}
+
+func allowSchema(userID string, res model.Resource, a model.Action) bool {
+	return res == erd.ResourceSchema && a == model.Read
+}
+
+func TestSchemaServedWithItsPermission(t *testing.T) {
+	r := buildRouter(t, appkit.ServerConfig{Migrations: []ddl.Step{shopStep}, Authorize: allowSchema}, fakeAuthn("admin"))
+	status, body := get(r, erd.SchemaPath)
+	if status != 200 {
+		t.Fatalf("GET %s = %d, want 200", erd.SchemaPath, status)
+	}
+	var rep erd.Report
+	if err := json.Decode([]byte(body), &rep); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(rep.SVG, `id="erd-table-invoice"`) || !strings.Contains(rep.SVG, ">shop<") {
+		t.Error("the diagram must draw the step's tables in a band named after the step")
+	}
+	if len(rep.Findings) != 3 || rep.Findings[0].Rule != erd.RuleMissingTable || rep.Findings[0].Target != "tenant" {
+		t.Fatalf("findings = %+v, want one missing_table → tenant", rep.Findings)
+	}
+}
+
+func TestSchemaRequiresDBSchemaPermission(t *testing.T) {
+	r := buildRouter(t, appkit.ServerConfig{Migrations: []ddl.Step{shopStep}, Authorize: allowFakeRead}, fakeAuthn("clerk"))
+	if status, _ := get(r, erd.SchemaPath); status != 403 {
+		t.Fatalf("GET %s without db_schema:read = %d, want 403", erd.SchemaPath, status)
+	}
+}
+
+func TestNoMigrationsNoSchemaRoute(t *testing.T) {
+	r := buildRouter(t, appkit.ServerConfig{Authorize: allowSchema}, fakeAuthn("admin"))
+	if status, _ := get(r, erd.SchemaPath); status == 200 {
+		t.Fatal("an app without migrations must not serve /_schema")
 	}
 }

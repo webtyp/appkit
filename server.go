@@ -3,6 +3,8 @@
 package appkit
 
 import (
+	"webtyp.com/ddl"
+	"webtyp.com/erd"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -18,6 +20,7 @@ type ServerConfig struct {
 	MCPTools   []mcp.ToolName           // operations an agent may call; empty = MCP closed
 	APIModules []router.APIModule       // modules with their own routes (MountAPI)
 	Register   func(r router.Router)    // the app's own routes; nil = none
+	Migrations []ddl.Step               // the app's migrations, in order; non-empty → GET /_schema (db_schema:read) serves its database diagram
 	Logger     func(...any)
 }
 
@@ -48,6 +51,14 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	mcpServer.MountAPI(r)
 
 	router.MountIntrospection(r, router.IntrospectionPath, cfg.Policy).Requires(router.ResourceIntrospection, model.Read)
+
+	if len(cfg.Migrations) > 0 {
+		tables, err := ddl.Capture(cfg.Migrations)
+		if err != nil {
+			return err
+		}
+		erd.Mount(r, erd.SchemaPath, erd.ReadApp(groupsOf(tables)...)).Requires(erd.ResourceSchema, model.Read)
+	}
 
 	for _, m := range cfg.APIModules {
 		if m != nil {

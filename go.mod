@@ -3,9 +3,12 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
+	webtyp.com/ddl v0.0.32
+	webtyp.com/erd v0.0.2
+	webtyp.com/json v0.5.36
 	webtyp.com/mcp v0.3.9
-	webtyp.com/model v0.2.8
-	webtyp.com/router v0.4.9
+	webtyp.com/model v0.2.9
+	webtyp.com/router v0.4.11
 	webtyp.com/rpc v0.2.4
 )
 
@@ -17,7 +20,8 @@ require (
 	webtyp.com/fetch v0.1.29 // indirect
 	webtyp.com/filepath v0.1.0 // indirect
 	webtyp.com/fmt v1.0.0 // indirect
-	webtyp.com/json v0.5.33 // indirect
+	webtyp.com/lang v0.1.10 // indirect
+	webtyp.com/storage v0.1.8 // indirect
 	webtyp.com/time v0.6.2 // indirect
 	webtyp.com/unixid v0.3.1 // indirect
 )
