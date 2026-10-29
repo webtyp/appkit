@@ -32,7 +32,7 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	}
 
 	if len(cfg.Operations) > 0 {
-		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Operations...); err != nil {
+		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Logger, cfg.Operations...); err != nil {
 			return err
 		}
 	}
