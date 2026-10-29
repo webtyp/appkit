@@ -7,7 +7,7 @@ require (
 	webtyp.com/erd v0.0.5
 	webtyp.com/json v0.5.37
 	webtyp.com/mcp v0.3.9
-	webtyp.com/model v0.2.9
+	webtyp.com/model v0.2.10
 	webtyp.com/router v0.4.11
 	webtyp.com/rpc v0.2.6
 )
