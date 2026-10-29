@@ -244,7 +244,7 @@ func TestSchemaServedWithItsPermission(t *testing.T) {
 	if err := json.Decode([]byte(body), &rep); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(rep.SVG, `id="erd-table-invoice"`) || !strings.Contains(rep.SVG, ">shop<") {
+	if !strings.Contains(rep.SVG, `id="erd-table-invoice"`) || !strings.Contains(rep.SVG, " shop<") {
 		t.Error("the diagram must draw the step's tables in a band named after the step")
 	}
 	errs := 0
