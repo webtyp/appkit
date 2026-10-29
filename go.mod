@@ -4,7 +4,7 @@ go 1.26.8
 
 require (
 	webtyp.com/ddl v0.0.32
-	webtyp.com/erd v0.0.4
+	webtyp.com/erd v0.0.5
 	webtyp.com/json v0.5.36
 	webtyp.com/mcp v0.3.9
 	webtyp.com/model v0.2.9
@@ -29,5 +29,3 @@ require (
 	webtyp.com/unixid v0.3.1 // indirect
 	webtyp.com/widget v0.6.45 // indirect
 )
-
-replace webtyp.com/erd => ../erd
