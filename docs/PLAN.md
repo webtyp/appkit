@@ -2,8 +2,10 @@
 PLAN: "refactor: the schema diagram through erd.ReadSteps; groupsOf deleted"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 8162838599035864991
+PR: https://github.com/webtyp/appkit/pull/4
+REVIEWED_COMMIT: aa29aa63ee4b5160ceedcc3a352fa9bb7f5ebc45
 ---
 
 > Read AGENTS.md at the repo root before any change.
