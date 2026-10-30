@@ -225,10 +225,10 @@ func (t *table) DecodeFields(_ model.FieldReader) {}
 
 var shopStep = ddl.Step{Name: "shop", Run: func(conn ddl.Execer, c ddl.Compiler) error {
 	d := ddl.New(conn, c)
-	if err := d.CreateTable(&table{name: "customer"}); err != nil {
+	if err := d.Sync(&table{name: "customer"}); err != nil {
 		return err
 	}
-	return d.CreateTable(&table{name: "invoice", ref: "tenant"})
+	return d.Sync(&table{name: "invoice", ref: "tenant"})
 }}
 
 func allowSchema(userID string, res model.Resource, a model.Action) bool {

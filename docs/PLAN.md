@@ -2,8 +2,10 @@
 PLAN: "test: create test tables with ddl.Sync — CreateTable is leaving ddl's public API"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 12571251936078116636
+PR: https://github.com/webtyp/appkit/pull/5
+REVIEWED_COMMIT: 00ed0cb2dda89e3392d2dff93aa3e815d2dce993
 ---
 
 > Read AGENTS.md at the repo root before any change.
