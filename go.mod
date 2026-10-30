@@ -3,7 +3,7 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
-	webtyp.com/ddl v0.0.32
+	webtyp.com/ddl v0.0.36
 	webtyp.com/erd v0.0.5
 	webtyp.com/json v0.5.37
 	webtyp.com/mcp v0.3.9
