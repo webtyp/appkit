@@ -24,7 +24,7 @@ require (
 	webtyp.com/fmt v1.0.0 // indirect
 	webtyp.com/font v0.0.5 // indirect
 	webtyp.com/lang v0.1.10 // indirect
-	webtyp.com/storage v0.1.8 // indirect
+	webtyp.com/storage v0.1.18 // indirect
 	webtyp.com/time v0.6.2 // indirect
 	webtyp.com/unixid v0.3.1 // indirect
 	webtyp.com/widget v0.6.46 // indirect
