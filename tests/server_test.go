@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -269,5 +270,27 @@ func TestNoMigrationsNoSchemaRoute(t *testing.T) {
 	r := buildRouter(t, appkit.ServerConfig{Authorize: allowSchema}, fakeAuthn("admin"))
 	if status, _ := get(r, erd.SchemaPath); status == 200 {
 		t.Fatal("an app without migrations must not serve /_schema")
+	}
+}
+
+func TestSchemaStepFails(t *testing.T) {
+	r := &mock.Router{}
+	err := appkit.MountServer(r, appkit.ServerConfig{
+		Migrations: []ddl.Step{{
+			Name: "broken",
+			Run: func(ddl.Execer, ddl.Compiler) error {
+				return errors.New("boom")
+			},
+		}},
+	})
+	if err == nil {
+		t.Fatal("MountServer on a broken migration step: want error, got nil")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "broken") || !strings.Contains(msg, "boom") {
+		t.Errorf("MountServer error = %q, want 'broken' and 'boom' in text", msg)
+	}
+	if status, _ := get(r, erd.SchemaPath); status != 404 {
+		t.Errorf("GET %s = %d, want 404 (not mounted)", erd.SchemaPath, status)
 	}
 }

@@ -53,11 +53,11 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	router.MountIntrospection(r, router.IntrospectionPath, cfg.Policy).Requires(router.ResourceIntrospection, model.Read)
 
 	if len(cfg.Migrations) > 0 {
-		tables, err := ddl.Capture(cfg.Migrations)
+		diagram, err := erd.ReadSteps(cfg.Migrations...)
 		if err != nil {
 			return err
 		}
-		erd.Mount(r, erd.SchemaPath, erd.ReadApp(groupsOf(tables)...)).Requires(erd.ResourceSchema, model.Read)
+		erd.Mount(r, erd.SchemaPath, diagram).Requires(erd.ResourceSchema, model.Read)
 	}
 
 	for _, m := range cfg.APIModules {
