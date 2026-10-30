@@ -27,5 +27,5 @@ require (
 	webtyp.com/storage v0.1.8 // indirect
 	webtyp.com/time v0.6.2 // indirect
 	webtyp.com/unixid v0.3.1 // indirect
-	webtyp.com/widget v0.6.45 // indirect
+	webtyp.com/widget v0.6.46 // indirect
 )
