@@ -2,6 +2,8 @@
 PLAN: "refactor: the schema diagram through erd.ReadSteps; groupsOf deleted"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 8162838599035864991
 ---
 
 > Read AGENTS.md at the repo root before any change.
