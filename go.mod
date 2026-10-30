@@ -4,11 +4,11 @@ go 1.26.8
 
 require (
 	webtyp.com/ddl v0.0.36
-	webtyp.com/erd v0.0.14
+	webtyp.com/erd v0.0.16
 	webtyp.com/json v0.5.37
 	webtyp.com/mcp v0.3.9
 	webtyp.com/model v0.2.12
-	webtyp.com/router v0.4.16
+	webtyp.com/router v0.4.17
 	webtyp.com/rpc v0.2.14
 )
 
