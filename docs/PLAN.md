@@ -3,6 +3,8 @@ PLAN: "feat: appkit.App, appkit.Module and the server/migrate entry points — a
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 4522725314813341400
 ---
 
 > Read AGENTS.md at the repo root before any change.
