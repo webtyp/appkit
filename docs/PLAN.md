@@ -3,6 +3,8 @@ PLAN: "feat!: one App value for both binaries — Module with Server and Browser
 TAG: v0.2.0
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 2227120075361327736
 ---
 
 > Read AGENTS.md at the repo root before any change.
