@@ -3,8 +3,10 @@ PLAN: "feat!: one App value for both binaries — Module with Server and Browser
 TAG: v0.2.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 2227120075361327736
+PR: https://github.com/webtyp/appkit/pull/7
+REVIEWED_COMMIT: 6ac5e1eb2ff7fb6bca2ff38b11571473360c2379
 ---
 
 > Read AGENTS.md at the repo root before any change.
