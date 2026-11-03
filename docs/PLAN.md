@@ -3,7 +3,7 @@ PLAN: "feat: appkit.App, appkit.Module and the server/migrate entry points — a
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: success
 SESSION: 4522725314813341400
 ---
 
@@ -515,3 +515,8 @@ A PR that does not compile, or whose tests could not run, is a failed delivery.
 | 4 | ServerEnv, BuildServer, Server | `serve.go` |
 | 5 | Tests | `tests/app_test.go` |
 | 6 | Documentation | `README.md`, `docs/ARCHITECTURE.md` |
+
+## Executor notes
+
+- Completed all tasks as specified. No deviation from the plan was necessary.
+- `grep -n "postgres" *.go go.mod` reports 2 matches for comments but NO imports in code or go.mod.
