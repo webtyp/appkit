@@ -1,4 +1,14 @@
 {
   "languages": ["es", "zh", "hi", "ar", "pt", "fr", "de", "ru"],
-  "keys": {}
+  "keys": {
+    "Access not authorized on this device": ["Acceso no autorizado en este dispositivo", "", "", "", "", "", "", ""],
+    "Create administrator": ["Crear administrador", "", "", "", "", "", "", ""],
+    "Enter your key to continue": ["Ingrese su clave para continuar", "", "", "", "", "", "", ""],
+    "First setup: create the administrator": ["Primera configuración: cree el administrador", "", "", "", "", "", "", ""],
+    "Key": ["Clave", "", "", "", "", "", "", ""],
+    "Loading…": ["Cargando…", "", "", "", "", "", "", ""],
+    "Log out": ["Cerrar sesión", "", "", "", "", "", "", ""],
+    "Sign in": ["Ingresar", "", "", "", "", "", "", ""],
+    "The administrator could not be created. Check the RUT entered.": ["No se pudo crear el administrador. Revise el RUT ingresado.", "", "", "", "", "", "", ""]
+  }
 }
