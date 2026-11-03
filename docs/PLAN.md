@@ -3,8 +3,10 @@ PLAN: "feat: appkit.App, appkit.Module and the server/migrate entry points — a
 TAG: v0.1.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: success
+STATUS: review
 SESSION: 4522725314813341400
+PR: https://github.com/webtyp/appkit/pull/6
+REVIEWED_COMMIT: 8d5a6d6928ccf4a4d3ac7a1989e9b9f82f1d8f52
 ---
 
 > Read AGENTS.md at the repo root before any change.
