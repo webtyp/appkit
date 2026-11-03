@@ -2,12 +2,16 @@ package tests
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"webtyp.com/appkit"
 	"webtyp.com/ddl"
 	"webtyp.com/model"
+	"webtyp.com/router"
+	"webtyp.com/rpc"
 	"webtyp.com/storage"
 	"webtyp.com/storage/mem"
 )
@@ -292,5 +296,31 @@ func TestMigrate_NoOpen(t *testing.T) {
 	}
 	if !errors.Is(err, appkit.ErrNoOpen) {
 		t.Fatalf("expected ErrNoOpen, got %v", err)
+	}
+}
+
+// TestBuildServer_AuthOperations: auth's own rpc operations (users, roles) are
+// published with the modules'.
+func TestBuildServer_AuthOperations(t *testing.T) {
+	app := appkit.App{
+		Open: openMem,
+		Auth: func(appkit.Deps) (appkit.Auth, error) {
+			return appkit.Auth{Authn: fakeAuthn("u1"), Authorize: allowFakeRead, Operations: []router.OperationModule{fakeOps{}}}, nil
+		},
+	}
+	srv, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := srv.Handler()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, rpc.DefaultPrefix+"/fake/list", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST %s/fake/list = %d, want 200: auth operations must be mounted", rpc.DefaultPrefix, rec.Code)
 	}
 }

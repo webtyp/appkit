@@ -28,5 +28,6 @@ type Auth struct {
 	Authn      router.Middleware
 	Authorize  model.Authorizer // nil = deny all
 	Policy     model.PolicyDescriber
-	APIModules []router.APIModule // auth's own endpoints (login, me, logout)
+	APIModules []router.APIModule       // auth's own endpoints (login, me, logout)
+	Operations []router.OperationModule // auth's own rpc operations (users, roles), published with the modules'
 }

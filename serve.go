@@ -96,7 +96,7 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 		Name:       app.Name,
 		Authorize:  authorize,
 		Policy:     au.Policy,
-		Operations: ops,
+		Operations: append(ops, au.Operations...),
 		MCPTools:   app.MCPTools,
 		APIModules: append(apis, au.APIModules...),
 		Register:   app.Register,
