@@ -1,4 +1,4 @@
-//go:build wasm
+//go:build browser
 
 package appkit
 
@@ -15,7 +15,7 @@ import (
 	"webtyp.com/json"
 	"webtyp.com/lang"
 	"webtyp.com/layout/apiexplorer"
-	"webtyp.com/layout/app"
+	appmenu "webtyp.com/layout/app"
 	"webtyp.com/layout/login"
 	"webtyp.com/layout/platformd"
 	"webtyp.com/layout/schemaview"
@@ -26,24 +26,13 @@ import (
 	"webtyp.com/view"
 )
 
-// Browser is the whole browser side of an application: its brand, its screens
-// and how long a session may stay idle.
-//
-//	var Browser = appkit.Browser{Brand: Brand, Screens: modules.Screens, DefaultScreen: catalogui.ID, IdleSeconds: 1800}
-type Browser struct {
-	Brand         Brand
-	Screens       func(caller router.Caller) []view.Screen // the modules' screens, in menu order
-	DefaultScreen string                                   // screen id opened first
-	IdleSeconds   int                                      // client idle lock; 0 = off
-}
-
 // RunBrowser asks the server who the user is and then shows the first-admin
 // setup, the access screen or the chassis with the screens the user may open.
 // It is the whole body of an app's web/browser/main.go; it never returns.
 //
-//	func main() { appkit.RunBrowser(config.Browser) }
-func RunBrowser(b Browser) {
-	s := buildSession(b, rpc.NewCaller(""))
+//	func main() { appkit.RunBrowser(config.App) }
+func RunBrowser(app App) {
+	s := buildSession(app, rpc.NewCaller(""))
 	s.platform.Init(nil)
 	Render("app", s)
 	select {}
@@ -93,7 +82,15 @@ func reload() { js.Global().Get("location").Call("reload") }
 
 func logout() { fetch.Post(auth.PathLogout).Send(func(*fetch.Response, error) { reload() }) }
 
-func buildSession(b Browser, caller router.Caller) *session {
+// idleSeconds is the client idle lock of the app's login: LoginByRUT.IdleMinutes, else 30 minutes.
+func idleSeconds(l Login) int {
+	if r, ok := l.(LoginByRUT); ok && r.IdleMinutes > 0 {
+		return r.IdleMinutes * 60
+	}
+	return defaultIdleMinutes * 60
+}
+
+func buildSession(app App, caller router.Caller) *session {
 	ids, err := unixid.NewUnixID()
 	if err != nil {
 		panic(err) // NewUnixID never fails in the browser
@@ -126,11 +123,11 @@ func buildSession(b Browser, caller router.Caller) *session {
 	showLogin := DeriveBool(func() bool { return !isAuthenticated.Get() && !needsSetup.Get() })
 
 	// One record store per page: what one screen saves, the others see.
-	menu, err := app.BuildMenu(
-		b.Screens(view.NewRecords().Caller(caller)),
+	menu, err := appmenu.BuildMenu(
+		screens(app, view.NewRecords().Caller(caller)),
 		ids,
 		func(r model.Resource) bool { return profile.Can(r, model.Read) },
-		app.Tools{API: apiexplorer.FromServer(), Database: schemaview.FromServer()},
+		appmenu.Tools{API: apiexplorer.FromServer(), Database: schemaview.FromServer()},
 	)
 	if err != nil {
 		panic(err)
@@ -138,13 +135,12 @@ func buildSession(b Browser, caller router.Caller) *session {
 
 	idle := 0
 	if authenticated {
-		idle = b.IdleSeconds
+		idle = idleSeconds(app.Login)
 	}
 	p := &platformd.Platform{
-		AppName:   b.Brand.Name,
-		Modules:   menu.Modules,
-		DefaultID: b.DefaultScreen,
-		User:      profileIdentity{profile: profile},
+		AppName: app.Brand.Name,
+		Modules: menu.Modules,
+		User:    profileIdentity{profile: profile},
 		UserActions: func() Component {
 			return Button().Text(lang.Translate(textLogOut).String()).
 				Class(string(usermenu.NameUserMenu.Class(usermenu.PartAction))).
@@ -200,7 +196,7 @@ func buildSession(b Browser, caller router.Caller) *session {
 	}
 
 	return &session{
-		brand: b.Brand, needsSetup: needsSetup, showLogin: showLogin, isAuthenticated: isAuthenticated,
+		brand: app.Brand, needsSetup: needsSetup, showLogin: showLogin, isAuthenticated: isAuthenticated,
 		platform: p, loginForm: loginForm, setupForm: setupForm,
 		loginMessage: loginMessage, setupMessage: setupMessage,
 	}
@@ -233,3 +229,14 @@ func (emptyArgs) IsNil() bool                      { return false }
 func (emptyArgs) EncodeFields(w model.FieldWriter) {}
 func (emptyArgs) DecodeFields(r model.FieldReader) {}
 func (emptyArgs) Validate(action byte) error       { return nil }
+
+// screens are the modules' screens in App.Modules order: the first one opens first.
+func screens(app App, caller router.Caller) []view.Screen {
+	var out []view.Screen
+	for _, m := range app.Modules {
+		if m.Browser.Screens != nil {
+			out = append(out, m.Browser.Screens(caller)...)
+		}
+	}
+	return out
+}

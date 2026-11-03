@@ -33,3 +33,6 @@ type LoginByRUT struct {
 }
 
 func (LoginByRUT) loginMethod() {}
+
+// defaultIdleMinutes is the session idle lock when LoginByRUT.IdleMinutes is 0 (and, on the server, SESSION_IDLE_MINUTES is unset).
+const defaultIdleMinutes = 30

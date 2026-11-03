@@ -1,8 +1,5 @@
 # webtyp/appkit Architecture
 
-> STATUS (remove this line when APP_COMPOSITION_MASTER_PLAN closes): session, permissions and first-admin
-> pieces are still being added; today appkit ships the server half only.
-
 ## Why it exists
 
 Every app with a login glued the same pieces by hand — server, session, permissions, menu, first admin —
@@ -30,5 +27,22 @@ the edge runtime), so the same mount runs in a local server and in a Worker, and
 indexdb, `storage/mem`) and hands it to appkit through the `storage` port; appkit may build on the engine-agnostic
 contracts (`storage`, `orm`, `changelog`) but never imports a concrete engine.
 
-## App and Module
-Build order is defined by the `App.Modules` order. `Find` sees only modules built before it. No database means no module built (the server still serves static files and `/_routes`). `App.Auth` runs after every module so it can `Find` them. Migrations are `Steps(app)`, which is the exact same list that `/_schema` draws.
+## App and Module — one value, two binaries
+
+`App` and `Module` carry no build tag, so `config.App` is the same value in `web/server` and `web/browser`. What belongs
+to one binary is a part with a twin per tag: `AppServer`, `ModuleServer` (real under `!browser`, empty under `browser`)
+and `ModuleBrowser` (the reverse). A module fills its parts from its own tagged files, so the browser wasm never links
+a `Build` or a driver, and gopls never sees an undefined symbol. Rejected: two values (`App` + `Browser`) — every module
+was listed twice and the browser main referenced a symbol gopls could not see.
+
+Build order is `App.Modules` order; `Find` sees only modules built before it. No database means no module built (the
+server still serves static files and `/_routes`). Migrations are `Steps(app)` — the login's own steps first (`auth`,
+`rbac`, `access` for `LoginByRUT`), then each module — the same list `/_schema` draws.
+
+## Login
+
+`Login` is closed (an unexported method): only appkit implements it. `LoginByRUT` builds `authority`, `rbac` and
+`access` after the modules, finds the `auth.TrustedIPStore` among them, and creates the first administrator: user,
+RUT identity, optional `FirstAdminRegistrar` (device and record, owned by a domain module), `admin` role with the
+wildcard permission. Brand `RenderPages`/`RenderHTML` are read by sitec from the app's `var Brand`; a zero `Brand`
+renders nothing.

@@ -57,10 +57,12 @@ func TestBuildServer_LoginNeedsTrustedIPStore(t *testing.T) {
 }
 
 type trustedIPMod struct{}
-func (trustedIPMod) ModelName() string { return "trusted" }
+
+func (trustedIPMod) ModelName() string                  { return "trusted" }
 func (trustedIPMod) IsTrustedIP(userID, ip string) bool { return true }
 
 type fakeCompiler struct{}
+
 func (fakeCompiler) CompileDDL(b interface{}, s *ddl.Step) {}
 
 func TestBuildServer_LoginByRUT(t *testing.T) {

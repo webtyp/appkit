@@ -14,19 +14,20 @@ import (
 	"webtyp.com/storage/mem"
 )
 
-type providerMod struct{}                       // provides categories
-func (providerMod) ModelName() string           { return "provider" }
-func (providerMod) Categories() []string        { return []string{"a"} }
+type providerMod struct{}                // provides categories
+func (providerMod) ModelName() string    { return "provider" }
+func (providerMod) Categories() []string { return []string{"a"} }
 
 type CategorySource interface{ Categories() []string }
 
 type consumerMod struct{ src CategorySource }
+
 func (consumerMod) ModelName() string { return "consumer" }
 
 var calls []string // order of Build/Migrate calls, reset per test
 func mod(name string, build func(appkit.Deps) (model.ModuleNaming, error)) appkit.Module {
 	return appkit.Module{
-		Name:    name,
+		Name: name,
 		Server: appkit.ModuleServer{
 			Migrate: func(ddl.Execer, ddl.Compiler) error { calls = append(calls, "migrate:"+name); return nil },
 			Build:   build,
@@ -36,8 +37,9 @@ func mod(name string, build func(appkit.Deps) (model.ModuleNaming, error)) appki
 func openMem(string) (storage.Conn, error) { return mem.New(), nil }
 
 type provider2Mod struct{}
-func (provider2Mod) ModelName() string           { return "provider2" }
-func (provider2Mod) Categories() []string        { return []string{"b"} }
+
+func (provider2Mod) ModelName() string    { return "provider2" }
+func (provider2Mod) Categories() []string { return []string{"b"} }
 
 func TestFind_OneProvider(t *testing.T) {
 	calls = nil
@@ -55,7 +57,7 @@ func TestFind_OneProvider(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Server: appkit.AppServer{Database: openMem},
+		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, consumer},
 	}
 
@@ -76,7 +78,7 @@ func TestFind_NoProvider(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Server: appkit.AppServer{Database: openMem},
+		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer},
 	}
 
@@ -103,7 +105,7 @@ func TestFind_ProviderAfterConsumer(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Server: appkit.AppServer{Database: openMem},
+		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer, provider},
 	}
 
@@ -130,7 +132,7 @@ func TestFind_TwoProviders(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Server: appkit.AppServer{Database: openMem},
+		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, provider2, consumer},
 	}
 
@@ -156,7 +158,7 @@ func TestBuildServer_NoDSN(t *testing.T) {
 	}
 
 	app := appkit.App{
-		Server: appkit.AppServer{Database: openMem},
+		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider},
 	}
 

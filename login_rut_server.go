@@ -19,13 +19,12 @@ import (
 )
 
 const (
-	EnvSessionIdleMinutes     = "SESSION_IDLE_MINUTES"
-	defaultSessionIdleMinutes = 30
-	maxLoginAttempts          = 3
-	loginWindow               = 15 * 60 // seconds
-	loginBlock                = 15 * 60
-	RoleAdmin                 = model.RoleCode("admin")
-	permWildcardAll           = "wildcard:all"
+	EnvSessionIdleMinutes = "SESSION_IDLE_MINUTES"
+	maxLoginAttempts      = 3
+	loginWindow           = 15 * 60 // seconds
+	loginBlock            = 15 * 60
+	RoleAdmin             = model.RoleCode("admin")
+	permWildcardAll       = "wildcard:all"
 )
 
 type serverAuth struct {
@@ -103,7 +102,7 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 		return serverAuth{}, err
 	}
 
-	idleMinutes := defaultSessionIdleMinutes
+	idleMinutes := defaultIdleMinutes
 	if l.IdleMinutes > 0 {
 		idleMinutes = l.IdleMinutes
 	} else if v := env.Get(EnvSessionIdleMinutes); v != "" {
@@ -112,7 +111,7 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 			idleMinutes = n
 		} else {
 			if logger != nil {
-				logger("app: Warning: invalid " + EnvSessionIdleMinutes + ", using default 30")
+				logger("appkit: invalid "+EnvSessionIdleMinutes+", using", defaultIdleMinutes, "minutes")
 			}
 		}
 	}
@@ -130,7 +129,7 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 
 	accessMod, err := access.New(access.Deps{
 		DB: d.DB, IDs: d.IDs, Users: authMod, Roles: rbacSvc, ProjectID: d.TenantID,
-		// La administración de roles se hace en la clínica, entrando con RUT (un factor).
+		// Roles are administered from the installation's own devices, entering by RUT: one factor.
 		Assurance: model.AssuranceSingleFactor,
 	})
 	if err != nil {
