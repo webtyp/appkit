@@ -1,17 +1,15 @@
+//go:build !wasm
+
 package tests
 
 import (
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"webtyp.com/appkit"
 	"webtyp.com/ddl"
 	"webtyp.com/model"
-	"webtyp.com/router"
-	"webtyp.com/rpc"
 	"webtyp.com/storage"
 	"webtyp.com/storage/mem"
 )
@@ -29,8 +27,10 @@ var calls []string // order of Build/Migrate calls, reset per test
 func mod(name string, build func(appkit.Deps) (model.ModuleNaming, error)) appkit.Module {
 	return appkit.Module{
 		Name:    name,
-		Migrate: func(ddl.Execer, ddl.Compiler) error { calls = append(calls, "migrate:"+name); return nil },
-		Build:   build,
+		Server: appkit.ModuleServer{
+			Migrate: func(ddl.Execer, ddl.Compiler) error { calls = append(calls, "migrate:"+name); return nil },
+			Build:   build,
+		},
 	}
 }
 func openMem(string) (storage.Conn, error) { return mem.New(), nil }
@@ -55,7 +55,7 @@ func TestFind_OneProvider(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Open:    openMem,
+		Server: appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, consumer},
 	}
 
@@ -76,7 +76,7 @@ func TestFind_NoProvider(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Open:    openMem,
+		Server: appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer},
 	}
 
@@ -103,7 +103,7 @@ func TestFind_ProviderAfterConsumer(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Open:    openMem,
+		Server: appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer, provider},
 	}
 
@@ -130,7 +130,7 @@ func TestFind_TwoProviders(t *testing.T) {
 	})
 
 	app := appkit.App{
-		Open:    openMem,
+		Server: appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, provider2, consumer},
 	}
 
@@ -147,14 +147,16 @@ func TestBuildServer_NoDSN(t *testing.T) {
 	calls = nil
 	provider := appkit.Module{
 		Name: "provider",
-		Build: func(d appkit.Deps) (model.ModuleNaming, error) {
-			calls = append(calls, "build:provider")
-			return providerMod{}, nil
+		Server: appkit.ModuleServer{
+			Build: func(d appkit.Deps) (model.ModuleNaming, error) {
+				calls = append(calls, "build:provider")
+				return providerMod{}, nil
+			},
 		},
 	}
 
 	app := appkit.App{
-		Open:    openMem,
+		Server: appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider},
 	}
 
@@ -177,35 +179,6 @@ func TestBuildServer_DSNWithoutOpen(t *testing.T) {
 	}
 	if !errors.Is(err, appkit.ErrNoOpen) {
 		t.Fatalf("expected ErrNoOpen, got %v", err)
-	}
-}
-
-func TestBuildServer_AuthSeesModules(t *testing.T) {
-	calls = nil
-	provider := mod("provider", func(d appkit.Deps) (model.ModuleNaming, error) {
-		return providerMod{}, nil
-	})
-
-	var authFound bool
-
-	app := appkit.App{
-		Open:    openMem,
-		Modules: []appkit.Module{provider},
-		Auth: func(d appkit.Deps) (appkit.Auth, error) {
-			_, err := appkit.Find[CategorySource](d)
-			if err == nil {
-				authFound = true
-			}
-			return appkit.Auth{}, nil
-		},
-	}
-
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if !authFound {
-		t.Fatalf("expected Auth to find provider")
 	}
 }
 
@@ -250,9 +223,11 @@ func TestRunMigrations_StopsAtError(t *testing.T) {
 	calls = nil
 	a := appkit.Module{
 		Name: "a",
-		Migrate: func(ddl.Execer, ddl.Compiler) error {
-			calls = append(calls, "migrate:a")
-			return errors.New("boom")
+		Server: appkit.ModuleServer{
+			Migrate: func(ddl.Execer, ddl.Compiler) error {
+				calls = append(calls, "migrate:a")
+				return errors.New("boom")
+			},
 		},
 	}
 	b := mod("b", nil)
@@ -296,31 +271,5 @@ func TestMigrate_NoOpen(t *testing.T) {
 	}
 	if !errors.Is(err, appkit.ErrNoOpen) {
 		t.Fatalf("expected ErrNoOpen, got %v", err)
-	}
-}
-
-// TestBuildServer_AuthOperations: auth's own rpc operations (users, roles) are
-// published with the modules'.
-func TestBuildServer_AuthOperations(t *testing.T) {
-	app := appkit.App{
-		Open: openMem,
-		Auth: func(appkit.Deps) (appkit.Auth, error) {
-			return appkit.Auth{Authn: fakeAuthn("u1"), Authorize: allowFakeRead, Operations: []router.OperationModule{fakeOps{}}}, nil
-		},
-	}
-	srv, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	h, err := srv.Handler()
-	if err != nil {
-		t.Fatal(err)
-	}
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, rpc.DefaultPrefix+"/fake/list", strings.NewReader("{}"))
-	req.Header.Set("Content-Type", "application/json")
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("POST %s/fake/list = %d, want 200: auth operations must be mounted", rpc.DefaultPrefix, rec.Code)
 	}
 }

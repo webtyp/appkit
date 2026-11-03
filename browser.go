@@ -72,11 +72,11 @@ func LoginScreen(b Brand, f *form.Form) *login.Login {
 	}
 }
 
-// LoginPages is the access screen served at "/" before any wasm loads: a plain
+// loginPages is the access screen served at "/" before any wasm loads: a plain
 // HTML form posting to auth.PathLoginRUT. An app returns it from RenderPages.
 //
-//	func (p *PreAuthScreen) RenderPages() []html.Page { return appkit.LoginPages(config.Brand) }
-func LoginPages(b Brand) []html.Page {
+//	func (p *PreAuthScreen) RenderPages() []html.Page { return appkit.loginPages(config.Brand) }
+func loginPages(b Brand) []html.Page {
 	ids, err := unixid.NewUnixID()
 	if err != nil {
 		return nil
@@ -93,10 +93,10 @@ func LoginPages(b Brand) []html.Page {
 	}}
 }
 
-// LoadingHTML is what #app shows while the browser binary downloads. An app
+// loadingHTML is what #app shows while the browser binary downloads. An app
 // returns it from RenderHTML.
 //
-//	func (p *PreAuthScreen) RenderHTML() string { return appkit.LoadingHTML() }
-func LoadingHTML() string {
+//	func (p *PreAuthScreen) RenderHTML() string { return appkit.loadingHTML() }
+func loadingHTML() string {
 	return `<div class="login"><div class="login__card"><p class="login__subtitle">` + lang.Translate(textLoading).String() + `</p></div></div>`
 }

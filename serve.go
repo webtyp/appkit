@@ -41,15 +41,15 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := Deps{IDs: ids, Events: &eventsmock.Broker{}, Tenant: app.Tenant, Timezone: app.Timezone}
+	d := Deps{IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Timezone: app.Timezone}
 
 	if se.DSN == "" {
 		logger(msgNoDatabase)
 	} else {
-		if app.Open == nil {
+		if app.Server.Database == nil {
 			return nil, ErrNoOpen
 		}
-		conn, err := app.Open(se.DSN)
+		conn, err := app.Server.Database(se.DSN)
 		if err != nil {
 			return nil, err
 		}
@@ -60,10 +60,10 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 	var apis []router.APIModule
 	if d.DB != nil {
 		for _, m := range app.Modules {
-			if m.Build == nil {
+			if m.Server.Build == nil {
 				continue
 			}
-			built, err := m.Build(d)
+			built, err := m.Server.Build(d)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", m.Name, err)
 			}
@@ -77,10 +77,13 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 		}
 	}
 
-	var au Auth
-	if app.Auth != nil && d.DB != nil {
-		if au, err = app.Auth(d); err != nil {
-			return nil, fmt.Errorf("auth: %w", err)
+	var au serverAuth
+	if d.DB != nil {
+		switch l := app.Login.(type) {
+		case LoginByRUT:
+			if au, err = l.build(d, logger); err != nil {
+				return nil, fmt.Errorf("login: %w", err)
+			}
 		}
 	}
 	authorize := au.Authorize
@@ -93,13 +96,13 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 		Logger: logger, Authn: au.Authn, Authorize: authorize, Policy: au.Policy,
 	})
 	if err := MountServer(srv.Router(), ServerConfig{
-		Name:       app.Name,
+		Name:       app.TenantID,
 		Authorize:  authorize,
 		Policy:     au.Policy,
 		Operations: append(ops, au.Operations...),
-		MCPTools:   app.MCPTools,
+		MCPTools:   app.Server.MCPTools,
 		APIModules: append(apis, au.APIModules...),
-		Register:   app.Register,
+		Register:   app.Server.Routes,
 		Migrations: Steps(app),
 		Logger:     logger,
 	}); err != nil {
