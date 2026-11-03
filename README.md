@@ -1,51 +1,90 @@
 # appkit
 <img src="docs/img/badges.svg">
 
-The application kit: one config turns WebTyp pieces (server, auth, permissions, session, menu) into a ready app
+The application kit: one value turns WebTyp pieces (server, login, permissions, session, menu) into a ready app, for both binaries.
 
 ## Why This Exists
 
-Without appkit, each app writes a complex `config/server.go` (database, ids, events, module constructors, adapters between modules, httpd, MountServer) plus `config/migrate.go` and `cmd/migrate/main.go`. With appkit, it's just one [`App`](app.go) literal; `web/server/main.go` and `migrate/main.go` are one line each. The dependency injection uses [`Find`](module.go) across each [`Module`](module.go).
+Without appkit, each app writes its server wiring, its login wiring (users, roles, first administrator, rate limit),
+its browser session, its migrate command, and lists every module twice — once for the server, once for the menu.
+With appkit, the app declares one [`App`](app.go); each module is one [`Module`](app.go) value; `web/server/main.go`
+and `migrate/main.go` are generated, and `web/browser/main.go` is one line.
 
 | Without | With |
 |---|---|
-| Hand-written `config/server.go` | One `appkit.App` literal |
-| Hand-written `config/migrate.go` | |
-| `cmd/migrate/main.go` | One line `migrate/main.go` |
-| Manual dependency injection | `appkit.Find` across `appkit.Module`s |
+| `config/server.go`, `config/auth.go`, `config/client.go` | One `appkit.App` |
+| Every module listed for the server and again for the menu | `App.Modules`, once |
+| `cmd/migrate/main.go` | Generated `migrate/main.go` = `appkit.Migrate(config.App)` |
+| Adapters written by hand between modules | [`Find`](module_server.go) by interface |
 
 ## Before You Start
 
-- The database driver belongs to the app (`App.Open`), so `appkit` never imports a driver directly (e.g. `postgres`).
-- Modules are built and migrated in exactly the order they appear in `App.Modules`.
-- A module that needs another module must be listed after it in the `App.Modules` list so `Find` can see it.
+- **Every symbol without a build tag exists under every tag.** `App` and `Module` have no tag; their parts that
+  belong to one binary (`AppServer`, `ModuleServer`, `ModuleBrowser`) are real structs under their tag and empty
+  structs under the other. That keeps gopls and both binaries compiling, and keeps server code out of the wasm.
+- Modules are built, migrated and shown in `App.Modules` order. A module that `Find`s another goes after it.
+  The first screen of the list is the one opened first.
+- `Login: appkit.LoginByRUT{}` brings users, roles (`access`), rate limit, idle lock and first-administrator setup.
+  A module that implements [`FirstAdminRegistrar`](module_server.go) completes that administrator (its device, its record).
+- appkit never imports a database driver: the app passes it in `AppServer.Database`.
 
 ## Step-by-Step Guide
 
-1. Create a module exporting `var Module = appkit.Module{Name, Migrate, Build}` whose `Build` uses `appkit.Find[CategorySource](d)`.
-2. Write `config/app.go` with the single `appkit.App{…}` declaration.
-3. Write the server and migration entries:
+1. A module exports one value from its `module/` package:
 
 ```go
-// web/server/main.go
-func main() { if err := appkit.Server(config.App); err != nil { log.Fatal(err) } }
+// module/module.go (no tag)
+var Module = appkit.Module{Name: "service_catalog", Server: server, Browser: browser}
+
+// module/server.go (//go:build !browser)
+var server = appkit.ModuleServer{Migrate: migrate.Migrate, Build: build}
+var browser appkit.ModuleBrowser
+
+func build(d appkit.Deps) (model.ModuleNaming, error) {
+	return servicecatalog.New(d.DB, servicecatalog.Deps{IDs: d.IDs, Publisher: d.Events, TenantID: d.TenantID})
+}
+
+// module/browser.go (//go:build browser)
+var server appkit.ModuleServer
+var browser = appkit.ModuleBrowser{Screens: ui.Screens}
 ```
+
+2. The app declares itself:
 
 ```go
-// migrate/main.go
-func main() { if err := appkit.Migrate(config.App); err != nil { log.Fatal(err) } }
+// config/app.go (no tag)
+var App = appkit.App{
+	TenantID: "acme",
+	Timezone: "America/Santiago",
+	Brand:    Brand, // config/brand.go: appkit.Brand{Name, LogoMark}; sitec renders its access page
+	Modules:  []appkit.Module{catalog.Module},
+	Login:    appkit.LoginByRUT{},
+	Server:   server,
+	Log:      fmt.Println,
+}
+
+// config/server.go (//go:build !browser)
+var server = appkit.AppServer{Database: postgres.Open}
+
+// config/browser.go (//go:build browser)
+var server appkit.AppServer
 ```
 
-| `ServerConfig` field | What |
-|---|---|
-| `Migrations []ddl.Step` | non-empty → `GET /_schema` (`db_schema:read`, never public) serves the app's database diagram ([`webtyp.com/erd`](https://github.com/webtyp/erd)), one band per migration step |
+3. The browser main, the only one the app writes:
+
+```go
+// web/browser/main.go
+func main() { appkit.RunBrowser(config.App) }
+```
 
 ## Documentation Map
 
 | File | What |
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design and decisions |
-| [`module.go`](module.go) | Modules and dependencies |
-| [`app.go`](app.go) | The Application declaration |
-| [`serve.go`](serve.go) | Server build and environment |
-| [`migrate.go`](migrate.go) | Migration execution |
+| [`app.go`](app.go) | `App`, `Module`, `Login`, `LoginByRUT` |
+| [`module_server.go`](module_server.go) | `ModuleServer`, `Deps`, `Find`, `FirstAdminRegistrar` |
+| [`login_rut_server.go`](login_rut_server.go) | What `LoginByRUT` wires on the server |
+| [`serve.go`](serve.go) / [`migrate.go`](migrate.go) | Server build, migrations |
+| [`run_browser.go`](run_browser.go) | The browser session |
+| [`server.go`](server.go) | `MountServer`: rpc, MCP, `/_routes`, `/_schema` |

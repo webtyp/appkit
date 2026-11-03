@@ -1,33 +1,38 @@
-//go:build !wasm
-
 package appkit
 
-import (
-	"webtyp.com/mcp"
-	"webtyp.com/model"
-	"webtyp.com/router"
-	"webtyp.com/storage"
-)
-
-// App is the whole server side of an application: its name, its installation
-// values, its database driver and the list of its modules, in order.
+// App is the whole application, for both binaries: web/server and web/browser read the same value.
+//
+//	var App = appkit.App{TenantID: "acme", Brand: Brand, Modules: []appkit.Module{catalog.Module}, Login: appkit.LoginByRUT{}, Server: server}
 type App struct {
-	Name     string                                 // MCP server name
-	Tenant   string                                 // Deps.Tenant for every module
-	Timezone string                                 // Deps.Timezone, e.g. "America/Santiago"
-	Open     func(dsn string) (storage.Conn, error) // the app's database driver (postgres.Open); nil = no database
-	Modules  []Module                               // build and migration order
-	Auth     func(d Deps) (Auth, error)             // runs after every module is built; nil = anonymous, deny all
-	MCPTools []mcp.ToolName                         // operations an agent may call; empty = MCP closed
-	Register func(r router.Router)                  // the app's own routes; nil = none
-	Logger   func(...any)                           // nil = discard
+	TenantID string       // the installation: every module's tenant, the rbac project and the MCP server name
+	Timezone string       // e.g. "America/Santiago"
+	Brand    Brand        // name and logo on the access screen and the chassis
+	Modules  []Module     // build, migration and menu order; the first screen is the one opened first
+	Login    Login        // how people enter; nil = nobody: every operation is denied
+	Server   AppServer    // what only the server binary needs (declared in a !browser file of the app)
+	Log      func(...any) // nil = discard
 }
 
-// Auth is what App.Auth returns: who the caller is and what they may do.
-type Auth struct {
-	Authn      router.Middleware
-	Authorize  model.Authorizer // nil = deny all
-	Policy     model.PolicyDescriber
-	APIModules []router.APIModule       // auth's own endpoints (login, me, logout)
-	Operations []router.OperationModule // auth's own rpc operations (users, roles), published with the modules'
+// Module is one domain module as an app lists it in App.Modules, with its server part and its screens.
+//
+//	var Module = appkit.Module{Name: "service_catalog", Server: server, Browser: browser}
+type Module struct {
+	Name    string        // identity: migration step name, error prefix
+	Server  ModuleServer  // a !browser file of the module fills it
+	Browser ModuleBrowser // a browser file of the module fills it
 }
+
+// Login is how people enter the app. Only appkit implements it: today LoginByRUT.
+type Login interface{ loginMethod() }
+
+// LoginByRUT is entry by RUT from a device the installation knows (trusted IP), with first-administrator setup.
+//
+//	Login: appkit.LoginByRUT{}
+type LoginByRUT struct {
+	IdleMinutes int // session idle lock; 0 = SESSION_IDLE_MINUTES or 30
+}
+
+func (LoginByRUT) loginMethod() {}
+
+// defaultIdleMinutes is the session idle lock when LoginByRUT.IdleMinutes is 0 (and, on the server, SESSION_IDLE_MINUTES is unset).
+const defaultIdleMinutes = 30

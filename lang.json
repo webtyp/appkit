@@ -1,14 +1,14 @@
 {
   "languages": ["es", "zh", "hi", "ar", "pt", "fr", "de", "ru"],
   "keys": {
-    "Access not authorized on this device": ["Acceso no autorizado en este dispositivo", "", "", "", "", "", "", ""],
-    "Create administrator": ["Crear administrador", "", "", "", "", "", "", ""],
-    "Enter your key to continue": ["Ingrese su clave para continuar", "", "", "", "", "", "", ""],
-    "First setup: create the administrator": ["Primera configuración: cree el administrador", "", "", "", "", "", "", ""],
-    "Key": ["Clave", "", "", "", "", "", "", ""],
-    "Loading…": ["Cargando…", "", "", "", "", "", "", ""],
-    "Log out": ["Cerrar sesión", "", "", "", "", "", "", ""],
-    "Sign in": ["Ingresar", "", "", "", "", "", "", ""],
-    "The administrator could not be created. Check the RUT entered.": ["No se pudo crear el administrador. Revise el RUT ingresado.", "", "", "", "", "", "", ""]
+    "Access not authorized on this device": ["Acceso no autorizado en este dispositivo", "此设备未获授权访问", "इस डिवाइस पर पहुँच की अनुमति नहीं है", "الوصول غير مصرح به على هذا الجهاز", "Acesso não autorizado neste dispositivo", "Accès non autorisé sur cet appareil", "Zugriff auf diesem Gerät nicht erlaubt", "Доступ с этого устройства не разрешён"],
+    "Create administrator": ["Crear administrador", "创建管理员", "व्यवस्थापक बनाएँ", "إنشاء المسؤول", "Criar administrador", "Créer l'administrateur", "Administrator anlegen", "Создать администратора"],
+    "Enter your key to continue": ["Ingrese su clave para continuar", "输入您的密钥以继续", "जारी रखने के लिए अपनी कुंजी दर्ज करें", "أدخل مفتاحك للمتابعة", "Digite sua chave para continuar", "Saisissez votre clé pour continuer", "Geben Sie Ihren Schlüssel ein, um fortzufahren", "Введите ключ, чтобы продолжить"],
+    "First setup: create the administrator": ["Primera configuración: cree el administrador", "首次设置：创建管理员", "पहला सेटअप: व्यवस्थापक बनाएँ", "الإعداد الأول: أنشئ المسؤول", "Primeira configuração: crie o administrador", "Première configuration : créez l'administrateur", "Ersteinrichtung: Administrator anlegen", "Первая настройка: создайте администратора"],
+    "Key": ["Clave", "密钥", "कुंजी", "المفتاح", "Chave", "Clé", "Schlüssel", "Ключ"],
+    "Loading…": ["Cargando…", "加载中…", "लोड हो रहा है…", "جارٍ التحميل…", "Carregando…", "Chargement…", "Wird geladen…", "Загрузка…"],
+    "Log out": ["Cerrar sesión", "退出登录", "लॉग आउट", "تسجيل الخروج", "Sair", "Se déconnecter", "Abmelden", "Выйти"],
+    "Sign in": ["Ingresar", "登录", "साइन इन करें", "تسجيل الدخول", "Entrar", "Se connecter", "Anmelden", "Войти"],
+    "The administrator could not be created. Check the RUT entered.": ["No se pudo crear el administrador. Revise el RUT ingresado.", "无法创建管理员。请检查输入的 RUT。", "व्यवस्थापक नहीं बनाया जा सका। दर्ज किया गया RUT जाँचें।", "تعذّر إنشاء المسؤول. تحقق من RUT المُدخل.", "Não foi possível criar o administrador. Verifique o RUT informado.", "L'administrateur n'a pas pu être créé. Vérifiez le RUT saisi.", "Der Administrator konnte nicht angelegt werden. Prüfen Sie den eingegebenen RUT.", "Не удалось создать администратора. Проверьте введённый RUT."]
   }
 }

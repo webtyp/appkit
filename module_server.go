@@ -1,4 +1,4 @@
-//go:build !wasm
+//go:build !browser
 
 package appkit
 
@@ -19,15 +19,12 @@ var (
 	ErrManyProviders = errors.New("appkit: more than one module provides it — keep one in App.Modules")
 )
 
-// Module is one domain module as an app lists it in App.Modules. appkit builds
-// it with the shared Deps and migrates it, both in App.Modules order.
-//
-//	var Module = appkit.Module{Name: "staff_manager", Migrate: migrate.Migrate, Build: build}
-type Module struct {
-	Name    string                                             // identity: migration step name and error prefix
-	Migrate func(conn ddl.Execer, compiler ddl.Compiler) error // nil: the module has no tables
-	Build   func(d Deps) (model.ModuleNaming, error)           // nil: migrations only, nothing to serve
+type ModuleServer struct {
+	Migrate func(conn ddl.Execer, compiler ddl.Compiler) error
+	Build   func(d Deps) (model.ModuleNaming, error)
 }
+
+type ModuleBrowser struct{}
 
 // Deps is what every module gets from appkit: the database, ids, events, the
 // installation's tenant and time zone, and Find over the modules built before it.
@@ -35,7 +32,7 @@ type Deps struct {
 	DB       *orm.DB
 	IDs      model.IDGenerator
 	Events   events.Publisher
-	Tenant   string
+	TenantID string
 	Timezone string
 
 	built []model.ModuleNaming
@@ -62,4 +59,10 @@ func Find[T any](d Deps) (T, error) {
 	default:
 		return zero, fmt.Errorf("%w: %T", ErrManyProviders, &zero)
 	}
+}
+
+// FirstAdminRegistrar is what a module offers to complete the first administrator (its device, its staff record).
+// Optional: with no module providing it, only the user and its role are created.
+type FirstAdminRegistrar interface {
+	RegisterFirstAdmin(userID, code, name, ip string) error
 }

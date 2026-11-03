@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 
+	"webtyp.com/access/migrate"
+	"webtyp.com/auth/authority"
 	"webtyp.com/ddl"
 	"webtyp.com/env"
+	"webtyp.com/rbac"
 )
 
 // EnvDatabaseURL is the environment variable that holds the database address.
@@ -15,7 +18,7 @@ const EnvDatabaseURL = "DATABASE_URL"
 
 var (
 	ErrNoDatabaseURL = errors.New("appkit: DATABASE_URL is not set")
-	ErrNoOpen        = errors.New("appkit: DATABASE_URL is set but App.Open is nil — give App the database driver (postgres.Open)")
+	ErrNoOpen        = errors.New("appkit: DATABASE_URL is set but App.Server.Database is nil — give it the database driver (postgres.Open)")
 	ErrNoCompiler    = errors.New("appkit: the database connection does not implement ddl.Compiler")
 )
 
@@ -23,9 +26,17 @@ var (
 // Migrate has none.
 func Steps(app App) []ddl.Step {
 	var out []ddl.Step
+	switch app.Login.(type) {
+	case LoginByRUT:
+		out = append(out,
+			ddl.Step{Name: "auth", Run: authority.Migrate},
+			ddl.Step{Name: "rbac", Run: rbac.Migrate},
+			ddl.Step{Name: "access", Run: migrate.Migrate},
+		)
+	}
 	for _, m := range app.Modules {
-		if m.Migrate != nil {
-			out = append(out, ddl.Step{Name: m.Name, Run: m.Migrate})
+		if m.Server.Migrate != nil {
+			out = append(out, ddl.Step{Name: m.Name, Run: m.Server.Migrate})
 		}
 	}
 	return out
@@ -50,10 +61,10 @@ func Migrate(app App) error {
 	if dsn == "" {
 		return ErrNoDatabaseURL
 	}
-	if app.Open == nil {
+	if app.Server.Database == nil {
 		return ErrNoOpen
 	}
-	conn, err := app.Open(dsn)
+	conn, err := app.Server.Database(dsn)
 	if err != nil {
 		return err
 	}
@@ -65,8 +76,8 @@ func Migrate(app App) error {
 }
 
 func loggerOf(app App) func(...any) {
-	if app.Logger != nil {
-		return app.Logger
+	if app.Log != nil {
+		return app.Log
 	}
 	return func(...any) {}
 }

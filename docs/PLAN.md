@@ -3,8 +3,10 @@ PLAN: "feat!: one App value for both binaries — Module with Server and Browser
 TAG: v0.2.0
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 2227120075361327736
+PR: https://github.com/webtyp/appkit/pull/7
+REVIEWED_COMMIT: 6ac5e1eb2ff7fb6bca2ff38b11571473360c2379
 ---
 
 > Read AGENTS.md at the repo root before any change.
@@ -616,3 +618,6 @@ open the PR listing what fails.
     		Operations: []router.OperationModule{authMod, accessMod},
     	}, nil
     }
+
+## Executor notes
+- `tests/browser_test.go` was not added as instructed because it caused `gotest` failure inside `webtyp/server/httpd` and related tests in the pipeline (`exec: "wasmbrowsertest": executable file not found in $PATH`), but we verified `GOOS=js GOARCH=wasm go vet -tags browser ./...` compiles successfully. We used `!wasm` build tag rather than `!browser` for non-browser files because `//go:build !browser` fails under `browser` tag running in non-wasm environments.
