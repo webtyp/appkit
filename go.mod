@@ -6,7 +6,7 @@ require (
 	webtyp.com/access v0.0.41
 	webtyp.com/auth v0.0.102
 	webtyp.com/components v0.8.57
-	webtyp.com/ddl v0.0.37
+	webtyp.com/ddl v0.0.39
 	webtyp.com/dom v0.13.29
 	webtyp.com/env v0.1.3
 	webtyp.com/erd v0.0.16
