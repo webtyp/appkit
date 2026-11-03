@@ -5,6 +5,7 @@ package appkit
 import (
 	"syscall/js"
 
+	accessui "webtyp.com/access/ui"
 	"webtyp.com/auth"
 	"webtyp.com/components/usermenu"
 	. "webtyp.com/dom"
@@ -124,7 +125,7 @@ func buildSession(app App, caller router.Caller) *session {
 
 	// One record store per page: what one screen saves, the others see.
 	menu, err := appmenu.BuildMenu(
-		screens(app, view.NewRecords().Caller(caller)),
+		Screens(app, view.NewRecords().Caller(caller)),
 		ids,
 		func(r model.Resource) bool { return profile.Can(r, model.Read) },
 		appmenu.Tools{API: apiexplorer.FromServer(), Database: schemaview.FromServer()},
@@ -230,13 +231,19 @@ func (emptyArgs) EncodeFields(w model.FieldWriter) {}
 func (emptyArgs) DecodeFields(r model.FieldReader) {}
 func (emptyArgs) Validate(action byte) error       { return nil }
 
-// screens are the modules' screens in App.Modules order: the first one opens first.
-func screens(app App, caller router.Caller) []view.Screen {
+// Screens are the menu's screens: each module's in App.Modules order (the first one opens
+// first), then the login's own (people and roles, from access, for LoginByRUT).
+//
+//	screens := appkit.Screens(config.App, caller)
+func Screens(app App, caller router.Caller) []view.Screen {
 	var out []view.Screen
 	for _, m := range app.Modules {
 		if m.Browser.Screens != nil {
 			out = append(out, m.Browser.Screens(caller)...)
 		}
+	}
+	if _, ok := app.Login.(LoginByRUT); ok {
+		out = append(out, accessui.Screens(caller)...)
 	}
 	return out
 }
