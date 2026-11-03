@@ -29,3 +29,6 @@ the edge runtime), so the same mount runs in a local server and in a Worker, and
 **appkit never chooses the database.** The app opens its connection on the engine it picked (postgres, sqlite,
 indexdb, `storage/mem`) and hands it to appkit through the `storage` port; appkit may build on the engine-agnostic
 contracts (`storage`, `orm`, `changelog`) but never imports a concrete engine.
+
+## App and Module
+Build order is defined by the `App.Modules` order. `Find` sees only modules built before it. No database means no module built (the server still serves static files and `/_routes`). `App.Auth` runs after every module so it can `Find` them. Migrations are `Steps(app)`, which is the exact same list that `/_schema` draws.
