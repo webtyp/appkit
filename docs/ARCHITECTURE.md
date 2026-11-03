@@ -40,6 +40,8 @@ Build order is `App.Modules` order; `Find` sees only modules built before it. No
 server still serves static files and `/_routes`). Migrations are `Steps(app)` — the login's own steps first (`auth`,
 `rbac`, `access` for `LoginByRUT`), then each module — the same list `/_schema` draws.
 
+One construction path: `buildModules` and `buildIdentity` are shared by `BuildServer` and `BuildModules`; server-only files.
+
 ## Login
 
 `Login` is closed (an unexported method): only appkit implements it. `LoginByRUT` builds `authority`, `rbac` and

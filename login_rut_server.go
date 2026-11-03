@@ -87,19 +87,19 @@ func seedFirstAdmin(d Deps, authMod *authority.Module, rbacSvc *rbac.Service, ac
 	return rbacSvc.AssignPermission(d.TenantID, role.Id, permWildcardAll)
 }
 
-func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
-	if bus, ok := d.Events.(eventBus); ok {
-		logSecurityEvent := securityEventLogger(logger)
-		bus.Subscribe(auth.TopicSecurity, func(e events.Event) {
-			if se, ok := e.Payload.(*auth.SecurityEvent); ok {
-				logSecurityEvent(*se)
-			}
-		})
-	}
+// identity is the people modules: roles, users and their administration.
+type identity struct {
+	roles  *rbac.Service
+	users  *authority.Module
+	access *access.Module
+}
 
+// buildIdentity builds rbac, authority and access on d.DB (the block that was inline in LoginByRUT.build,
+// including the idle-minutes resolution and authMod.SetLog(logger)).
+func (l LoginByRUT) buildIdentity(d Deps, logger func(...any)) (identity, error) {
 	rbacSvc, err := rbac.New(d.DB)
 	if err != nil {
-		return serverAuth{}, err
+		return identity{}, err
 	}
 
 	idleMinutes := defaultIdleMinutes
@@ -123,7 +123,7 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 		Permissions: &auth.Permissions{Grants: rbacSvc, ProjectID: d.TenantID},
 	})
 	if err != nil {
-		return serverAuth{}, err
+		return identity{}, err
 	}
 	authMod.SetLog(logger)
 
@@ -132,6 +132,24 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 		// Roles are administered from the installation's own devices, entering by RUT: one factor.
 		Assurance: model.AssuranceSingleFactor,
 	})
+	if err != nil {
+		return identity{}, err
+	}
+
+	return identity{roles: rbacSvc, users: authMod, access: accessMod}, nil
+}
+
+func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
+	if bus, ok := d.Events.(eventBus); ok {
+		logSecurityEvent := securityEventLogger(logger)
+		bus.Subscribe(auth.TopicSecurity, func(e events.Event) {
+			if se, ok := e.Payload.(*auth.SecurityEvent); ok {
+				logSecurityEvent(*se)
+			}
+		})
+	}
+
+	id, err := l.buildIdentity(d, logger)
 	if err != nil {
 		return serverAuth{}, err
 	}
@@ -142,14 +160,14 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 	}
 
 	loginLimiter := auth.NewIPLimiter(maxLoginAttempts, loginWindow, loginBlock)
-	authMod.Enable(trustedip.New(authMod, trustedStore, authMod, authMod, false,
+	id.users.Enable(trustedip.New(id.users, trustedStore, id.users, id.users, false,
 		trustedip.WithRateLimit(loginLimiter),
-		trustedip.WithFirstAdminSetup(authMod, func(code, name, ip string) error {
-			return seedFirstAdmin(d, authMod, rbacSvc, accessMod, code, name, ip)
+		trustedip.WithFirstAdminSetup(id.users, func(code, name, ip string) error {
+			return seedFirstAdmin(d, id.users, id.roles, id.access, code, name, ip)
 		})))
 
 	if logger != nil {
-		switch hasAdmin, err := authMod.HasIdentity(auth.ProviderTrustedIP); {
+		switch hasAdmin, err := id.users.HasIdentity(auth.ProviderTrustedIP); {
 		case err != nil:
 			logger("appkit: the database does not answer the administrators query — run go run ./migrate once. Detail:", err)
 		case !hasAdmin:
@@ -158,11 +176,11 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 	}
 
 	return serverAuth{
-		Authn: authMod.Authenticate(),
+		Authn: id.users.Authenticate(),
 		Authorize: func(userID string, resource model.Resource, action model.Action) bool {
-			return rbacSvc.Can(d.TenantID, userID, resource, action)
+			return id.roles.Can(d.TenantID, userID, resource, action)
 		},
-		APIModules: []router.APIModule{authMod},
-		Operations: []router.OperationModule{authMod, accessMod},
+		APIModules: []router.APIModule{id.users},
+		Operations: []router.OperationModule{id.users, id.access},
 	}, nil
 }

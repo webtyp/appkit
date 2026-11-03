@@ -19,6 +19,7 @@ const EnvDatabaseURL = "DATABASE_URL"
 var (
 	ErrNoDatabaseURL = errors.New("appkit: DATABASE_URL is not set")
 	ErrNoOpen        = errors.New("appkit: DATABASE_URL is set but App.Server.Database is nil — give it the database driver (postgres.Open)")
+	ErrNoDatabase    = errors.New("appkit: BuildModules needs a database")
 	ErrNoCompiler    = errors.New("appkit: the database connection does not implement ddl.Compiler")
 )
 

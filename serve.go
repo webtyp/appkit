@@ -31,6 +31,28 @@ type ServerEnv struct {
 	DSN       string
 }
 
+// buildModules builds app.Modules in order on d.DB, appending each to d.built (so later modules Find it).
+// It returns the operation and API modules among them, for BuildServer to mount.
+func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router.APIModule, err error) {
+	for _, m := range app.Modules {
+		if m.Server.Build == nil {
+			continue
+		}
+		built, err := m.Server.Build(*d)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%s: %w", m.Name, err)
+		}
+		d.built = append(d.built, built)
+		if o, ok := built.(router.OperationModule); ok {
+			ops = append(ops, o)
+		}
+		if a, ok := built.(router.APIModule); ok {
+			apis = append(apis, a)
+		}
+	}
+	return ops, apis, nil
+}
+
 // BuildServer builds the whole server without listening: database, modules in
 // App.Modules order, auth, and every contract MountServer mounts.
 //
@@ -59,21 +81,8 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 	var ops []router.OperationModule
 	var apis []router.APIModule
 	if d.DB != nil {
-		for _, m := range app.Modules {
-			if m.Server.Build == nil {
-				continue
-			}
-			built, err := m.Server.Build(d)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", m.Name, err)
-			}
-			d.built = append(d.built, built)
-			if o, ok := built.(router.OperationModule); ok {
-				ops = append(ops, o)
-			}
-			if a, ok := built.(router.APIModule); ok {
-				apis = append(apis, a)
-			}
+		if ops, apis, err = buildModules(app, &d); err != nil {
+			return nil, err
 		}
 	}
 
