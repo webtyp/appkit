@@ -2,8 +2,10 @@
 PLAN: "feat: appkit.BuildModules — build the app's modules and people modules on a given database"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 7762449640776806414
+PR: https://github.com/webtyp/appkit/pull/8
+REVIEWED_COMMIT: 2ed634a14679d03bfcac8a8b9dcd0387fbc3b74e
 ---
 
 > Read AGENTS.md at the repo root before any change.

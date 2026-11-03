@@ -77,6 +77,15 @@ var server appkit.AppServer
 func main() { appkit.RunBrowser(config.App) }
 ```
 
+Import steps build the modules on their transaction with `BuildModules`:
+
+```go
+	plan := dataimport.Plan[appkit.Deps]{
+		Build: func(tx *orm.DB) (appkit.Deps, error) { return appkit.BuildModules(config.App, tx) },
+	}
+	// in a step: users, err := appkit.Find[*authority.Module](s.Modules)
+```
+
 ## Documentation Map
 
 | File | What |
