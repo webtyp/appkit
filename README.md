@@ -19,9 +19,9 @@ and `migrate/main.go` are generated, and `web/browser/main.go` is one line.
 
 ## Before You Start
 
-- **Every symbol without a build tag exists under every tag.** `App` and `Module` have no tag; their parts that
-  belong to one binary (`AppServer`, `ModuleServer`, `ModuleBrowser`) are real structs under their tag and empty
-  structs under the other. That keeps gopls and both binaries compiling, and keeps server code out of the wasm.
+- **appkit's types carry no destination tag**: `App`, `Module`, `AppServer`, `ModuleServer`, `ModuleBrowser`
+  exist in every binary, so gopls never reports an undefined symbol. What keeps server code out of the wasm is the
+  **values**: a module (and the app) fills each part from a tagged file and leaves it zero in the other binary.
 - Modules are built, migrated and shown in `App.Modules` order. A module that `Find`s another goes after it.
   The first screen of the list is the one opened first.
 - `Login: appkit.LoginByRUT{}` brings users, roles (`access`), rate limit, idle lock and first-administrator setup.

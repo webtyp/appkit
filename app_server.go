@@ -1,5 +1,3 @@
-//go:build !browser
-
 package appkit
 
 import (

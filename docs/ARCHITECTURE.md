@@ -30,9 +30,10 @@ contracts (`storage`, `orm`, `changelog`) but never imports a concrete engine.
 ## App and Module — one value, two binaries
 
 `App` and `Module` carry no build tag, so `config.App` is the same value in `web/server` and `web/browser`. What belongs
-to one binary is a part with a twin per tag: `AppServer`, `ModuleServer` (real under `!browser`, empty under `browser`)
-and `ModuleBrowser` (the reverse). A module fills its parts from its own tagged files, so the browser wasm never links
-a `Build` or a driver, and gopls never sees an undefined symbol. Rejected: two values (`App` + `Browser`) — every module
+to one binary is a part — `AppServer`, `ModuleServer`, `ModuleBrowser` — whose type exists in every binary (appkit
+carries no destination tag, so gopls never sees an undefined symbol). The module and the app fill each part from their
+own tagged files and leave it zero in the other binary, so the browser wasm never links a `Build` or a driver, and the
+server never links a screen. `RunBrowser` is `wasm` only (it needs `syscall/js`). Rejected: two values (`App` + `Browser`) — every module
 was listed twice and the browser main referenced a symbol gopls could not see.
 
 Build order is `App.Modules` order; `Find` sees only modules built before it. No database means no module built (the

@@ -1,5 +1,3 @@
-//go:build !browser
-
 package appkit
 
 import (
@@ -23,8 +21,6 @@ type ModuleServer struct {
 	Migrate func(conn ddl.Execer, compiler ddl.Compiler) error
 	Build   func(d Deps) (model.ModuleNaming, error)
 }
-
-type ModuleBrowser struct{}
 
 // Deps is what every module gets from appkit: the database, ids, events, the
 // installation's tenant and time zone, and Find over the modules built before it.

@@ -9,7 +9,7 @@ type App struct {
 	Brand    Brand        // name and logo on the access screen and the chassis
 	Modules  []Module     // build, migration and menu order; the first screen is the one opened first
 	Login    Login        // how people enter; nil = nobody: every operation is denied
-	Server   AppServer    // what only the server binary needs (declared in a !browser file of the app)
+	Server   AppServer    // what only the server binary needs; the app fills it from a !browser file, zero in the browser
 	Log      func(...any) // nil = discard
 }
 
@@ -18,8 +18,8 @@ type App struct {
 //	var Module = appkit.Module{Name: "service_catalog", Server: server, Browser: browser}
 type Module struct {
 	Name    string        // identity: migration step name, error prefix
-	Server  ModuleServer  // a !browser file of the module fills it
-	Browser ModuleBrowser // a browser file of the module fills it
+	Server  ModuleServer  // the module fills it from a !browser file; zero in the browser
+	Browser ModuleBrowser // the module fills it from a browser file; zero on the server
 }
 
 // Login is how people enter the app. Only appkit implements it: today LoginByRUT.
