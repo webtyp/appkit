@@ -70,6 +70,17 @@ var server = appkit.AppServer{Database: postgres.Open}
 var server appkit.AppServer
 ```
 
+`Timezone` is **required**: an IANA name such as `America/Santiago`. appkit loads it once and every module receives
+it already loaded — `Deps.Zone` on the server, `BrowserDeps.Zone` in the browser — so every date and hour is shown on
+the installation's clock. Empty or unknown → the app does not start (`ErrNoTimezone`), never UTC in silence.
+
+```go
+// a module's screens (browser)
+var browser = appkit.ModuleBrowser{Screens: func(d appkit.BrowserDeps) []view.Screen {
+	return ui.Screens(d.Caller, d.Zone)
+}}
+```
+
 3. The browser main, the only one the app writes:
 
 ```go
