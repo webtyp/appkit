@@ -21,7 +21,7 @@ require (
 	webtyp.com/mcp v0.3.20
 	webtyp.com/model v0.2.13
 	webtyp.com/orm v0.12.25
-	webtyp.com/rbac v0.0.28
+	webtyp.com/rbac v0.0.29
 	webtyp.com/router v0.4.17
 	webtyp.com/rpc v0.2.15
 	webtyp.com/server v0.2.105
@@ -41,7 +41,7 @@ require (
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/tools v0.45.0 // indirect
 	howett.net/plist v1.0.0 // indirect
