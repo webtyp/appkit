@@ -2,8 +2,10 @@
 PLAN: "feat!: the installation's time zone reaches every module as a loaded time.Zone (server Deps.Zone, browser BrowserDeps)"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 5460934571777480108
+PR: https://github.com/webtyp/appkit/pull/9
+REVIEWED_COMMIT: afdfec1d57be76cc99d2940c6397c1e16dbe564f
 ---
 
 > Read AGENTS.md at the repo root before any change.

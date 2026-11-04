@@ -23,6 +23,7 @@ import (
 	"webtyp.com/model"
 	"webtyp.com/router"
 	"webtyp.com/rpc"
+	"webtyp.com/time"
 	"webtyp.com/unixid"
 	"webtyp.com/view"
 )
@@ -124,8 +125,15 @@ func buildSession(app App, caller router.Caller) *session {
 	showLogin := DeriveBool(func() bool { return !isAuthenticated.Get() && !needsSetup.Get() })
 
 	// One record store per page: what one screen saves, the others see.
+	screens, errScreens := Screens(app, view.NewRecords().Caller(caller))
+	if errScreens != nil {
+		js.Global().Get("console").Call("error", errScreens.Error())
+		isAuthenticated.Set(false)
+		needsSetup.Set(false)
+		screens = nil
+	}
 	menu, err := appmenu.BuildMenu(
-		Screens(app, view.NewRecords().Caller(caller)),
+		screens,
 		ids,
 		func(r model.Resource) bool { return profile.Can(r, model.Read) },
 		appmenu.Tools{API: apiexplorer.FromServer(), Database: schemaview.FromServer()},
@@ -153,6 +161,9 @@ func buildSession(app App, caller router.Caller) *session {
 	}
 
 	loginMessage := NewString("")
+	if errScreens != nil {
+		loginMessage.Set(errScreens.Error())
+	}
 	setupMessage := NewString("")
 
 	rutData := &auth.RUTLoginData{}
@@ -235,15 +246,21 @@ func (emptyArgs) Validate(action byte) error       { return nil }
 // first), then the login's own (people and roles, from access, for LoginByRUT).
 //
 //	screens := appkit.Screens(config.App, caller)
-func Screens(app App, caller router.Caller) []view.Screen {
+func Screens(app App, caller router.Caller) ([]view.Screen, error) {
+	zone, err := time.LoadZone(app.Timezone)
+	if err != nil {
+		return nil, ErrNoTimezone
+	}
+	d := BrowserDeps{Caller: caller, Zone: zone}
+
 	var out []view.Screen
 	for _, m := range app.Modules {
 		if m.Browser.Screens != nil {
-			out = append(out, m.Browser.Screens(caller)...)
+			out = append(out, m.Browser.Screens(d)...)
 		}
 	}
 	if _, ok := app.Login.(LoginByRUT); ok {
 		out = append(out, accessui.Screens(caller)...)
 	}
-	return out
+	return out, nil
 }

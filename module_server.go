@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"webtyp.com/time"
+
 	"webtyp.com/ddl"
 	"webtyp.com/events"
 	"webtyp.com/model"
@@ -15,6 +17,7 @@ import (
 var (
 	ErrNoProvider    = errors.New("appkit: no module provides it — list the module that does before the one that needs it in App.Modules")
 	ErrManyProviders = errors.New("appkit: more than one module provides it — keep one in App.Modules")
+	ErrNoTimezone    = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
 )
 
 type ModuleServer struct {
@@ -29,7 +32,7 @@ type Deps struct {
 	IDs      model.IDGenerator
 	Events   events.Publisher
 	TenantID string
-	Timezone string
+	Zone     time.Zone // the installation's zone (App.Timezone), loaded once: every local date and hour comes from it
 
 	built []model.ModuleNaming
 }
