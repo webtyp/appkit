@@ -20,7 +20,7 @@ require (
 	webtyp.com/layout v0.3.99
 	webtyp.com/mcp v0.3.20
 	webtyp.com/model v0.2.13
-	webtyp.com/orm v0.12.24
+	webtyp.com/orm v0.12.25
 	webtyp.com/rbac v0.0.28
 	webtyp.com/router v0.4.17
 	webtyp.com/rpc v0.2.15
