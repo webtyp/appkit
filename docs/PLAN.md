@@ -2,6 +2,8 @@
 PLAN: "feat!: the installation's time zone reaches every module as a loaded time.Zone (server Deps.Zone, browser BrowserDeps)"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 5460934571777480108
 ---
 
 > Read AGENTS.md at the repo root before any change.
