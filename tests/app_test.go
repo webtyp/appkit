@@ -56,7 +56,7 @@ func TestFind_OneProvider(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, consumer},
 	}
@@ -77,7 +77,7 @@ func TestFind_NoProvider(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer},
 	}
@@ -104,7 +104,7 @@ func TestFind_ProviderAfterConsumer(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer, provider},
 	}
@@ -131,7 +131,7 @@ func TestFind_TwoProviders(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, provider2, consumer},
 	}
@@ -157,7 +157,7 @@ func TestBuildServer_NoDSN(t *testing.T) {
 		},
 	}
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider},
 	}
@@ -173,7 +173,7 @@ func TestBuildServer_NoDSN(t *testing.T) {
 
 func TestBuildServer_DSNWithoutOpen(t *testing.T) {
 	calls = nil
-	app := appkit.App{}
+	app := appkit.App{Timezone: "America/Santiago"}
 
 	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
 	if err == nil {
@@ -190,7 +190,7 @@ func TestSteps_Order(t *testing.T) {
 	b := mod("b", nil)
 	c := appkit.Module{Name: "c"} // no Migrate
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Modules: []appkit.Module{a, b, c},
 	}
 
@@ -208,7 +208,7 @@ func TestRunMigrations_Order(t *testing.T) {
 	a := mod("a", nil)
 	b := mod("b", nil)
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Modules: []appkit.Module{a, b},
 	}
 
@@ -234,7 +234,7 @@ func TestRunMigrations_StopsAtError(t *testing.T) {
 	}
 	b := mod("b", nil)
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		Modules: []appkit.Module{a, b},
 	}
 
@@ -273,5 +273,13 @@ func TestMigrate_NoOpen(t *testing.T) {
 	}
 	if !errors.Is(err, appkit.ErrNoOpen) {
 		t.Fatalf("expected ErrNoOpen, got %v", err)
+	}
+}
+
+func TestBuildServer_NoTimezone(t *testing.T) {
+	app := appkit.App{}
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
+	if !errors.Is(err, appkit.ErrNoTimezone) {
+		t.Fatalf("expected ErrNoTimezone, got %v", err)
 	}
 }

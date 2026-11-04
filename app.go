@@ -5,7 +5,7 @@ package appkit
 //	var App = appkit.App{TenantID: "acme", Brand: Brand, Modules: []appkit.Module{catalog.Module}, Login: appkit.LoginByRUT{}, Server: server}
 type App struct {
 	TenantID string       // the installation: every module's tenant, the rbac project and the MCP server name
-	Timezone string       // e.g. "America/Santiago"
+	Timezone string       // the installation's zone (IANA name), reaches modules as Deps.Zone / BrowserDeps.Zone
 	Brand    Brand        // name and logo on the access screen and the chassis
 	Modules  []Module     // build, migration and menu order; the first screen is the one opened first
 	Login    Login        // how people enter; nil = nobody: every operation is denied

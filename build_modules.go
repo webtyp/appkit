@@ -4,10 +4,11 @@ package appkit
 
 import (
 	"fmt"
+	"webtyp.com/time"
 
+	eventsmock "webtyp.com/events/mock" // same import path serve.go uses for eventsmock.Broker
 	"webtyp.com/orm"
 	"webtyp.com/unixid"
-	eventsmock "webtyp.com/events/mock" // same import path serve.go uses for eventsmock.Broker
 )
 
 // BuildModules builds the app's modules, in App.Modules order, and — with LoginByRUT — its people modules
@@ -28,7 +29,11 @@ func BuildModules(app App, db *orm.DB) (Deps, error) {
 	if err != nil {
 		return Deps{}, err
 	}
-	d := Deps{DB: db, IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Timezone: app.Timezone}
+	zone, err := time.LoadZone(app.Timezone)
+	if err != nil {
+		return Deps{}, ErrNoTimezone
+	}
+	d := Deps{DB: db, IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone}
 	if _, _, err := buildModules(app, &d); err != nil {
 		return Deps{}, err
 	}

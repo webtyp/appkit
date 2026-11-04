@@ -16,7 +16,7 @@ import (
 )
 
 func TestBuildModules_NilDB(t *testing.T) {
-	_, err := appkit.BuildModules(appkit.App{TenantID: "t"}, nil)
+	_, err := appkit.BuildModules(appkit.App{Timezone: "America/Santiago", TenantID: "t"}, nil)
 	if !errors.Is(err, appkit.ErrNoDatabase) {
 		t.Fatalf("expected ErrNoDatabase, got %v", err)
 	}
@@ -27,7 +27,7 @@ func TestBuildModules_FindsAppModules(t *testing.T) {
 		return trustedIPMod{}, nil
 	})
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		TenantID: "t",
 		Modules:  []appkit.Module{trustedProvider},
 	}
@@ -48,7 +48,7 @@ func TestBuildModules_LoginAddsPeople(t *testing.T) {
 		return trustedIPMod{}, nil
 	})
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		TenantID: "t",
 		Login:    appkit.LoginByRUT{},
 		Modules:  []appkit.Module{trustedProvider},
@@ -73,7 +73,7 @@ func TestBuildModules_ModuleErrorNamed(t *testing.T) {
 		return nil, errors.New("boom")
 	})
 
-	app := appkit.App{
+	app := appkit.App{Timezone: "America/Santiago",
 		TenantID: "t",
 		Modules:  []appkit.Module{badProvider},
 	}
@@ -87,5 +87,36 @@ func TestBuildModules_ModuleErrorNamed(t *testing.T) {
 		if !strings.Contains(err.Error(), "bad: boom") {
 			t.Fatalf("expected error containing 'bad: boom', got %q", err.Error())
 		}
+	}
+}
+
+func TestBuildModules_BadTimezone(t *testing.T) {
+	app := appkit.App{Timezone: "Mars/Base"}
+	db := orm.New(mem.New())
+	_, err := appkit.BuildModules(app, db)
+	if !errors.Is(err, appkit.ErrNoTimezone) {
+		t.Fatalf("expected ErrNoTimezone, got %v", err)
+	}
+}
+
+func TestBuildModules_ZoneInDeps(t *testing.T) {
+	var zoneName string
+	mod := appkit.Module{
+		Name: "zone_reader",
+		Server: appkit.ModuleServer{
+			Build: func(d appkit.Deps) (model.ModuleNaming, error) {
+				zoneName = d.Zone.Name()
+				return trustedIPMod{}, nil
+			},
+		},
+	}
+	app := appkit.App{Timezone: "America/Santiago", Modules: []appkit.Module{mod}}
+	db := orm.New(mem.New())
+	_, err := appkit.BuildModules(app, db)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if zoneName != "America/Santiago" {
+		t.Fatalf("expected zone name America/Santiago, got %q", zoneName)
 	}
 }

@@ -36,7 +36,7 @@ own tagged files and leave it zero in the other binary, so the browser wasm neve
 server never links a screen. `RunBrowser` is `wasm` only (it needs `syscall/js`). Rejected: two values (`App` + `Browser`) — every module
 was listed twice and the browser main referenced a symbol gopls could not see.
 
-Build order is `App.Modules` order; `Find` sees only modules built before it. No database means no module built (the
+Build order is `App.Modules` order; `Find` sees only modules built before it. the zone is loaded once by appkit; modules never load it. No database means no module built (the
 server still serves static files and `/_routes`). Migrations are `Steps(app)` — the login's own steps first (`auth`,
 `rbac`, `access` for `LoginByRUT`), then each module — the same list `/_schema` draws.
 

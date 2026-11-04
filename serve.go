@@ -10,6 +10,7 @@ import (
 	"webtyp.com/orm"
 	"webtyp.com/router"
 	"webtyp.com/server/httpd"
+	"webtyp.com/time"
 	"webtyp.com/unixid"
 )
 
@@ -63,7 +64,11 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := Deps{IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Timezone: app.Timezone}
+	zone, err := time.LoadZone(app.Timezone)
+	if err != nil {
+		return nil, ErrNoTimezone
+	}
+	d := Deps{IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone}
 
 	if se.DSN == "" {
 		logger(msgNoDatabase)

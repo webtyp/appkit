@@ -13,7 +13,7 @@ import (
 )
 
 func TestSteps_LoginByRUTFirst(t *testing.T) {
-	app := appkit.App{TenantID: "test",
+	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
 		Login:   appkit.LoginByRUT{},
 		Modules: []appkit.Module{mod("a", nil)},
 	}
@@ -30,7 +30,7 @@ func TestSteps_LoginByRUTFirst(t *testing.T) {
 }
 
 func TestSteps_NoLoginNoAuthSteps(t *testing.T) {
-	app := appkit.App{TenantID: "test",
+	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
 		Modules: []appkit.Module{mod("a", nil)},
 	}
 	steps := appkit.Steps(app)
@@ -43,7 +43,7 @@ func TestSteps_NoLoginNoAuthSteps(t *testing.T) {
 }
 
 func TestBuildServer_LoginNeedsTrustedIPStore(t *testing.T) {
-	app := appkit.App{TenantID: "test",
+	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
 		Login:  appkit.LoginByRUT{},
 		Server: appkit.AppServer{Database: openMem},
 	}
@@ -70,7 +70,7 @@ func TestBuildServer_LoginByRUT(t *testing.T) {
 		return trustedIPMod{}, nil
 	})
 
-	app := appkit.App{TenantID: "test",
+	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
 		Login:   appkit.LoginByRUT{},
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{trustedProvider},
