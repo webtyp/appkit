@@ -80,7 +80,7 @@ func BuildServer(app App, se ServerEnv, mounts ...func(r router.Router, policy m
 	if err != nil {
 		return nil, ErrNoTimezone
 	}
-	d := Deps{IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone}
+	d := Deps{IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone, Log: logger}
 
 	if se.DSN == "" {
 		logger(msgNoDatabase)
