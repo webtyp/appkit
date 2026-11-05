@@ -6,15 +6,15 @@ The application kit: one value turns WebTyp pieces (server, login, permissions, 
 ## Why This Exists
 
 Without appkit, each app writes its server wiring, its login wiring (users, roles, first administrator, rate limit),
-its browser session, its migrate command, and lists every module twice — once for the server, once for the menu.
+its browser session, and lists every module twice — once for the server, once for the menu.
 With appkit, the app declares one [`App`](app.go); each module is one [`Module`](app.go) value; `web/server/main.go`
-and `migrate/main.go` are generated, and `web/browser/main.go` is one line.
+and `web/browser/main.go` are generated (migrations live in `webtyp.com/migrate`, dev tools in `webtyp.com/devtools`).
 
 | Without | With |
 |---|---|
 | `config/server.go`, `config/auth.go`, `config/client.go` | One `appkit.App` |
 | Every module listed for the server and again for the menu | `App.Modules`, once |
-| `cmd/migrate/main.go` | Generated `migrate/main.go` = `appkit.Migrate(config.App)` |
+| Dev tools mounted by hand | Passed to `Server` and `Browser` |
 | Adapters written by hand between modules | [`Find`](module_server.go) by interface |
 
 ## Before You Start
@@ -22,7 +22,7 @@ and `migrate/main.go` are generated, and `web/browser/main.go` is one line.
 - **appkit's types carry no destination tag**: `App`, `Module`, `AppServer`, `ModuleServer`, `ModuleBrowser`
   exist in every binary, so gopls never reports an undefined symbol. What keeps server code out of the wasm is the
   **values**: a module (and the app) fills each part from a tagged file and leaves it zero in the other binary.
-- Modules are built, migrated and shown in `App.Modules` order. A module that `Find`s another goes after it.
+- Modules are built and shown in `App.Modules` order. A module that `Find`s another goes after it.
   The first screen of the list is the one opened first.
 - `Login: appkit.LoginByRUT{}` brings users, roles (`access`), rate limit, idle lock and first-administrator setup.
   A module that implements [`FirstAdminRegistrar`](module_server.go) completes that administrator (its device, its record).
@@ -81,11 +81,14 @@ var browser = appkit.ModuleBrowser{Screens: func(d appkit.BrowserDeps) []view.Sc
 }}
 ```
 
-3. The browser main, the only one the app writes:
+3. The generated mains:
 
 ```go
+// web/server/main.go
+func main() { if err := appkit.Server(config.App, devtools.Server(config.App)...); err != nil { log.Fatal(err) } }
+
 // web/browser/main.go
-func main() { appkit.RunBrowser(config.App) }
+func main() { appkit.Browser(config.App, devtools.Menu()) }
 ```
 
 Import steps build the modules on their transaction with `BuildModules`:
@@ -105,6 +108,7 @@ Import steps build the modules on their transaction with `BuildModules`:
 | [`app.go`](app.go) | `App`, `Module`, `Login`, `LoginByRUT` |
 | [`module_server.go`](module_server.go) | `ModuleServer`, `Deps`, `Find`, `FirstAdminRegistrar` |
 | [`login_rut_server.go`](login_rut_server.go) | What `LoginByRUT` wires on the server |
-| [`serve.go`](serve.go) / [`migrate.go`](migrate.go) | Server build, migrations |
-| [`run_browser.go`](run_browser.go) | The browser session |
-| [`server.go`](server.go) | `MountServer`: rpc, MCP, `/_routes`, `/_schema` |
+| [`brand.go`](brand.go) / [`brand_ssr.go`](brand_ssr.go) | `Brand`, `LoginForm`, `LoginScreen` and SSR pre-render |
+| [`env.go`](env.go) / [`serve.go`](serve.go) | Server environment, server build (`Server`, `BuildServer`) |
+| [`browser.go`](browser.go) | The browser session (`Browser`) |
+| [`server.go`](server.go) | `MountServer`: rpc, MCP, `Mounts` |

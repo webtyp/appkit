@@ -8,39 +8,8 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
-	"webtyp.com/ddl"
 	"webtyp.com/model"
 )
-
-func TestSteps_LoginByRUTFirst(t *testing.T) {
-	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
-		Login:   appkit.LoginByRUT{},
-		Modules: []appkit.Module{mod("a", nil)},
-	}
-	steps := appkit.Steps(app)
-	if len(steps) != 4 {
-		t.Fatalf("expected 4 steps, got %d", len(steps))
-	}
-	expected := []string{"auth", "rbac", "access", "a"}
-	for i, s := range steps {
-		if s.Name != expected[i] {
-			t.Errorf("step %d: expected %s, got %s", i, expected[i], s.Name)
-		}
-	}
-}
-
-func TestSteps_NoLoginNoAuthSteps(t *testing.T) {
-	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
-		Modules: []appkit.Module{mod("a", nil)},
-	}
-	steps := appkit.Steps(app)
-	if len(steps) != 1 {
-		t.Fatalf("expected 1 step, got %d", len(steps))
-	}
-	if steps[0].Name != "a" {
-		t.Errorf("expected step 'a', got %s", steps[0].Name)
-	}
-}
 
 func TestBuildServer_LoginNeedsTrustedIPStore(t *testing.T) {
 	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
@@ -60,10 +29,6 @@ type trustedIPMod struct{}
 
 func (trustedIPMod) ModelName() string                  { return "trusted" }
 func (trustedIPMod) IsTrustedIP(userID, ip string) bool { return true }
-
-type fakeCompiler struct{}
-
-func (fakeCompiler) CompileDDL(b interface{}, s *ddl.Step) {}
 
 func TestBuildServer_LoginByRUT(t *testing.T) {
 	trustedProvider := mod("trusted", func(d appkit.Deps) (model.ModuleNaming, error) {

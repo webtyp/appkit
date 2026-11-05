@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
-	"webtyp.com/ddl"
 	"webtyp.com/model"
 	"webtyp.com/storage"
 	"webtyp.com/storage/mem"
@@ -29,8 +28,7 @@ func mod(name string, build func(appkit.Deps) (model.ModuleNaming, error)) appki
 	return appkit.Module{
 		Name: name,
 		Server: appkit.ModuleServer{
-			Migrate: func(ddl.Execer, ddl.Compiler) error { calls = append(calls, "migrate:"+name); return nil },
-			Build:   build,
+			Build: build,
 		},
 	}
 }
@@ -176,98 +174,6 @@ func TestBuildServer_DSNWithoutOpen(t *testing.T) {
 	app := appkit.App{Timezone: "America/Santiago"}
 
 	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !errors.Is(err, appkit.ErrNoOpen) {
-		t.Fatalf("expected ErrNoOpen, got %v", err)
-	}
-}
-
-func TestSteps_Order(t *testing.T) {
-	calls = nil
-	a := mod("a", nil)
-	b := mod("b", nil)
-	c := appkit.Module{Name: "c"} // no Migrate
-
-	app := appkit.App{Timezone: "America/Santiago",
-		Modules: []appkit.Module{a, b, c},
-	}
-
-	steps := appkit.Steps(app)
-	if len(steps) != 2 {
-		t.Fatalf("expected 2 steps, got %d", len(steps))
-	}
-	if steps[0].Name != "a" || steps[1].Name != "b" {
-		t.Fatalf("expected steps 'a' and 'b', got %s and %s", steps[0].Name, steps[1].Name)
-	}
-}
-
-func TestRunMigrations_Order(t *testing.T) {
-	calls = nil
-	a := mod("a", nil)
-	b := mod("b", nil)
-
-	app := appkit.App{Timezone: "America/Santiago",
-		Modules: []appkit.Module{a, b},
-	}
-
-	err := appkit.RunMigrations(app, mem.New(), nil)
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if len(calls) != 2 || calls[0] != "migrate:a" || calls[1] != "migrate:b" {
-		t.Fatalf("expected calls ['migrate:a', 'migrate:b'], got %v", calls)
-	}
-}
-
-func TestRunMigrations_StopsAtError(t *testing.T) {
-	calls = nil
-	a := appkit.Module{
-		Name: "a",
-		Server: appkit.ModuleServer{
-			Migrate: func(ddl.Execer, ddl.Compiler) error {
-				calls = append(calls, "migrate:a")
-				return errors.New("boom")
-			},
-		},
-	}
-	b := mod("b", nil)
-
-	app := appkit.App{Timezone: "America/Santiago",
-		Modules: []appkit.Module{a, b},
-	}
-
-	err := appkit.RunMigrations(app, mem.New(), nil)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "migrate a: boom") {
-		t.Fatalf("expected error containing 'migrate a: boom', got %q", err.Error())
-	}
-	for _, c := range calls {
-		if c == "migrate:b" {
-			t.Fatalf("expected no 'migrate:b' call")
-		}
-	}
-}
-
-func TestMigrate_NoDatabaseURL(t *testing.T) {
-	t.Setenv("DATABASE_URL", "")
-	app := appkit.App{}
-	err := appkit.Migrate(app)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !errors.Is(err, appkit.ErrNoDatabaseURL) {
-		t.Fatalf("expected ErrNoDatabaseURL, got %v", err)
-	}
-}
-
-func TestMigrate_NoOpen(t *testing.T) {
-	t.Setenv("DATABASE_URL", "x")
-	app := appkit.App{}
-	err := appkit.Migrate(app)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

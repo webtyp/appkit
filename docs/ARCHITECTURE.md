@@ -17,8 +17,8 @@ AWS AppConfig).
 
 `MountServer(r router.Router, cfg ServerConfig) error` works on the `router.Router` **contract**, never on a
 concrete transport: it mounts rpc operations, the MCP server (only the tools named in `MCPTools`; empty =
-MCP closed), `/_routes` protected with `Requires(router.ResourceIntrospection, model.Read)` in every mode, the
-`APIModules`, and the app's own `Register(r)`. A nil `Authorize` becomes `DenyAll` (and logs every denial).
+MCP closed), the `APIModules`, extra routes passed in `Mounts` (dev tools), and the app's own `Register(r)`.
+A nil `Authorize` becomes `DenyAll` (and logs every denial).
 
 It deliberately has no `httpd`, `env`, `dev.go` or `prod.go`: the concrete transport lives in `webtyp/server` (or
 the edge runtime), so the same mount runs in a local server and in a Worker, and tests use `router/mock`.
@@ -33,12 +33,11 @@ contracts (`storage`, `orm`, `changelog`) but never imports a concrete engine.
 to one binary is a part — `AppServer`, `ModuleServer`, `ModuleBrowser` — whose type exists in every binary (appkit
 carries no destination tag, so gopls never sees an undefined symbol). The module and the app fill each part from their
 own tagged files and leave it zero in the other binary, so the browser wasm never links a `Build` or a driver, and the
-server never links a screen. `RunBrowser` is `wasm` only (it needs `syscall/js`). Rejected: two values (`App` + `Browser`) — every module
+server never links a screen. `Browser` is `wasm` only. Rejected: two values (`App` + `Browser`) — every module
 was listed twice and the browser main referenced a symbol gopls could not see.
 
-Build order is `App.Modules` order; `Find` sees only modules built before it. the zone is loaded once by appkit; modules never load it. No database means no module built (the
-server still serves static files and `/_routes`). Migrations are `Steps(app)` — the login's own steps first (`auth`,
-`rbac`, `access` for `LoginByRUT`), then each module — the same list `/_schema` draws.
+Build order is `App.Modules` order; `Find` sees only modules built before it. The zone is loaded once by appkit; modules never load it. No database means no module built (the
+server still serves static files). Database migrations live in `webtyp.com/migrate` and dev tools in `webtyp.com/devtools`.
 
 One construction path: `buildModules` and `buildIdentity` are shared by `BuildServer` and `BuildModules`; server-only files.
 

@@ -3,11 +3,10 @@
 package appkit
 
 import (
-	"fmt"
-	"webtyp.com/time"
-
 	eventsmock "webtyp.com/events/mock" // same import path serve.go uses for eventsmock.Broker
+	"webtyp.com/fmt"
 	"webtyp.com/orm"
+	"webtyp.com/time"
 	"webtyp.com/unixid"
 )
 
@@ -40,7 +39,7 @@ func BuildModules(app App, db *orm.DB) (Deps, error) {
 	if l, ok := app.Login.(LoginByRUT); ok {
 		id, err := l.buildIdentity(d, loggerOf(app))
 		if err != nil {
-			return Deps{}, fmt.Errorf("login: %w", err)
+			return Deps{}, fmt.ErrType(fmt.Err("login"), err)
 		}
 		d.built = append(d.built, id.users, id.access)
 	}

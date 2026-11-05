@@ -4,14 +4,11 @@ package tests
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
-	"fmt"
 	"webtyp.com/appkit"
-	"webtyp.com/ddl"
-	"webtyp.com/erd"
-	"webtyp.com/json"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -159,30 +156,6 @@ func TestDefaultDenyWithoutAuthorize(t *testing.T) {
 	}
 }
 
-func TestIntrospectionRequiresAPIExplorer(t *testing.T) {
-	r := buildRouter(t, appkit.ServerConfig{
-		Operations: []router.OperationModule{fakeOps{}},
-		Authorize:  allowFakeRead,
-	}, nil)
-	status, _ := get(r, router.IntrospectionPath)
-	if status != 403 {
-		t.Fatalf("GET %s without router.ResourceIntrospection read permission: want 403, got %d", router.IntrospectionPath, status)
-	}
-}
-
-func TestIntrospectionOpensWithItsPermission(t *testing.T) {
-	r := buildRouter(t, appkit.ServerConfig{
-		Operations: []router.OperationModule{fakeOps{}},
-		Authorize: func(userID string, res model.Resource, a model.Action) bool {
-			return res == router.ResourceIntrospection && a == model.Read
-		},
-	}, fakeAuthn("test-user"))
-	status, _ := get(r, router.IntrospectionPath)
-	if status != 200 {
-		t.Fatalf("GET %s with router.ResourceIntrospection read permission: want 200, got %d", router.IntrospectionPath, status)
-	}
-}
-
 func TestRegisterMountsAppRoutes(t *testing.T) {
 	r := buildRouter(t, appkit.ServerConfig{
 		Authorize: allowFakeRead,
@@ -201,98 +174,65 @@ func TestRegisterMountsAppRoutes(t *testing.T) {
 	}
 }
 
-type table struct {
-	name string
-	ref  string // foreign key column "ref_id" → ref, when not empty
-}
+type fakePolicy struct{}
 
-func (t *table) ModelName() string { return t.name }
-func (t *table) Schema() []model.Field {
-	f := []model.Field{{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}}}
-	if t.ref != "" {
-		f = append(f, model.Field{Name: "ref_id", Type: model.Text()})
-	}
-	return f
-}
-func (t *table) SchemaExt() []model.FieldExt {
-	if t.ref == "" {
-		return nil
-	}
-	return []model.FieldExt{{Field: t.Schema()[1], Ref: t.ref}}
-}
-func (t *table) Pointers() []any                  { return nil }
-func (t *table) IsNil() bool                      { return t == nil }
-func (t *table) EncodeFields(_ model.FieldWriter) {}
-func (t *table) DecodeFields(_ model.FieldReader) {}
+func (fakePolicy) Grants() []model.RoleGrant { return nil }
 
-var shopStep = ddl.Step{Name: "shop", Run: func(conn ddl.Execer, c ddl.Compiler) error {
-	d := ddl.New(conn, c)
-	if err := d.Sync(&table{name: "customer"}); err != nil {
-		return err
-	}
-	return d.Sync(&table{name: "invoice", ref: "tenant"})
-}}
+func allowAll(string, model.Resource, model.Action) bool { return true }
 
-func allowSchema(userID string, res model.Resource, a model.Action) bool {
-	return res == erd.ResourceSchema && a == model.Read
-}
+func TestMountsReceiveRouterAndPolicy(t *testing.T) {
+	p := fakePolicy{}
+	var got model.PolicyDescriber
+	calls := 0
+	r := buildRouter(t, appkit.ServerConfig{
+		Policy: p,
+		Mounts: []func(r router.Router, policy model.PolicyDescriber) error{
+			func(r router.Router, pol model.PolicyDescriber) error {
+				calls++
+				got = pol
+				r.Get("/x", func(ctx router.Context) {
+					ctx.Write([]byte("ok"))
+				}).Public()
+				return nil
+			},
+		},
+	}, nil)
 
-func TestSchemaServedWithItsPermission(t *testing.T) {
-	r := buildRouter(t, appkit.ServerConfig{Migrations: []ddl.Step{shopStep}, Authorize: allowSchema}, fakeAuthn("admin"))
-	status, body := get(r, erd.SchemaPath)
-	if status != 200 {
-		t.Fatalf("GET %s = %d, want 200", erd.SchemaPath, status)
+	status, body := get(r, "/x")
+	if status != 200 || body != "ok" {
+		t.Fatalf("GET /x = %d, %s; want 200, ok", status, body)
 	}
-	var rep erd.Report
-	if err := json.Decode([]byte(body), &rep); err != nil {
-		t.Fatal(err)
+	if calls != 1 {
+		t.Errorf("mount called %d times, want 1", calls)
 	}
-	if !strings.Contains(rep.SVG, `id="erd-table-invoice"`) || !strings.Contains(rep.SVG, " shop<") {
-		t.Error("the diagram must draw the step's tables in a band named after the step")
-	}
-	errs := 0
-	for _, f := range rep.Findings {
-		if f.Rule.Level() == erd.LevelError {
-			errs++
-		}
-	}
-	if errs != 1 || rep.Findings[0].Rule != erd.RuleMissingTable || rep.Findings[0].Target != "tenant" {
-		t.Fatalf("findings = %+v, want one error: missing_table → tenant", rep.Findings)
+	if got != p {
+		t.Errorf("got policy %v, want %v", got, p)
 	}
 }
 
-func TestSchemaRequiresDBSchemaPermission(t *testing.T) {
-	r := buildRouter(t, appkit.ServerConfig{Migrations: []ddl.Step{shopStep}, Authorize: allowFakeRead}, fakeAuthn("clerk"))
-	if status, _ := get(r, erd.SchemaPath); status != 403 {
-		t.Fatalf("GET %s without db_schema:read = %d, want 403", erd.SchemaPath, status)
-	}
-}
-
-func TestNoMigrationsNoSchemaRoute(t *testing.T) {
-	r := buildRouter(t, appkit.ServerConfig{Authorize: allowSchema}, fakeAuthn("admin"))
-	if status, _ := get(r, erd.SchemaPath); status == 200 {
-		t.Fatal("an app without migrations must not serve /_schema")
-	}
-}
-
-func TestSchemaStepFails(t *testing.T) {
+func TestMountErrorStopsServer(t *testing.T) {
 	r := &mock.Router{}
 	err := appkit.MountServer(r, appkit.ServerConfig{
-		Migrations: []ddl.Step{{
-			Name: "broken",
-			Run: func(ddl.Execer, ddl.Compiler) error {
+		Mounts: []func(r router.Router, policy model.PolicyDescriber) error{
+			func(router.Router, model.PolicyDescriber) error {
 				return errors.New("boom")
 			},
-		}},
+		},
 	})
 	if err == nil {
-		t.Fatal("MountServer on a broken migration step: want error, got nil")
+		t.Fatal("MountServer on broken mount: want error, got nil")
 	}
-	msg := err.Error()
-	if !strings.Contains(msg, "broken") || !strings.Contains(msg, "boom") {
-		t.Errorf("MountServer error = %q, want 'broken' and 'boom' in text", msg)
+	if !strings.Contains(err.Error(), "boom") {
+		t.Errorf("error = %q, want 'boom'", err.Error())
 	}
-	if status, _ := get(r, erd.SchemaPath); status != 404 {
-		t.Errorf("GET %s = %d, want 404 (not mounted)", erd.SchemaPath, status)
+}
+
+func TestNoDevToolsByDefault(t *testing.T) {
+	r := buildRouter(t, appkit.ServerConfig{Authorize: allowAll}, fakeAuthn("admin"))
+	if status, _ := get(r, router.IntrospectionPath); status != 404 {
+		t.Fatalf("GET %s = %d, want 404", router.IntrospectionPath, status)
+	}
+	if status, _ := get(r, "/_schema"); status != 404 {
+		t.Fatalf("GET /_schema = %d, want 404", status)
 	}
 }

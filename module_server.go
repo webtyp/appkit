@@ -1,23 +1,20 @@
 package appkit
 
 import (
-	"errors"
-	"fmt"
-
-	"webtyp.com/time"
-
 	"webtyp.com/ddl"
 	"webtyp.com/events"
+	"webtyp.com/fmt"
 	"webtyp.com/model"
 	"webtyp.com/orm"
+	"webtyp.com/time"
 )
 
 // ErrNoProvider and ErrManyProviders are what Find returns when the modules
 // built so far hold zero or more than one value of the requested type.
 var (
-	ErrNoProvider    = errors.New("appkit: no module provides it — list the module that does before the one that needs it in App.Modules")
-	ErrManyProviders = errors.New("appkit: more than one module provides it — keep one in App.Modules")
-	ErrNoTimezone    = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
+	ErrNoProvider    = fmt.Err("appkit: no module provides it — list the module that does before the one that needs it in App.Modules")
+	ErrManyProviders = fmt.Err("appkit: more than one module provides it — keep one in App.Modules")
+	ErrNoTimezone    = fmt.Err("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
 )
 
 type ModuleServer struct {
@@ -52,11 +49,11 @@ func Find[T any](d Deps) (T, error) {
 	}
 	switch n {
 	case 0:
-		return zero, fmt.Errorf("%w: %T", ErrNoProvider, &zero)
+		return zero, fmt.ErrType(ErrNoProvider, fmt.Errf("%T", &zero))
 	case 1:
 		return found, nil
 	default:
-		return zero, fmt.Errorf("%w: %T", ErrManyProviders, &zero)
+		return zero, fmt.ErrType(ErrManyProviders, fmt.Errf("%T", &zero))
 	}
 }
 

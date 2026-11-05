@@ -9,7 +9,6 @@ require (
 	webtyp.com/ddl v0.0.39
 	webtyp.com/dom v0.13.29
 	webtyp.com/env v0.1.3
-	webtyp.com/erd v0.0.16
 	webtyp.com/events v0.1.7
 	webtyp.com/fetch v0.1.29
 	webtyp.com/fmt v1.0.0
@@ -53,6 +52,7 @@ require (
 	webtyp.com/crypto v0.0.30 // indirect
 	webtyp.com/css v0.4.31 // indirect
 	webtyp.com/dbus v0.1.1 // indirect
+	webtyp.com/erd v0.0.14 // indirect
 	webtyp.com/escape v0.1.0 // indirect
 	webtyp.com/filepath v0.1.0 // indirect
 	webtyp.com/font v0.0.5 // indirect

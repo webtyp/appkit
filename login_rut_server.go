@@ -3,19 +3,17 @@
 package appkit
 
 import (
-	"errors"
-	"fmt"
-	"webtyp.com/time"
-
 	"webtyp.com/access"
 	"webtyp.com/auth"
 	"webtyp.com/auth/authority"
 	trustedip "webtyp.com/auth/trusted_ip"
 	"webtyp.com/env"
 	"webtyp.com/events"
+	"webtyp.com/fmt"
 	"webtyp.com/model"
 	"webtyp.com/rbac"
 	"webtyp.com/router"
+	"webtyp.com/time"
 )
 
 const (
@@ -71,7 +69,7 @@ func seedFirstAdmin(d Deps, authMod *authority.Module, rbacSvc *rbac.Service, ac
 		if err := reg.RegisterFirstAdmin(user.Id, code, name, ip); err != nil {
 			return err
 		}
-	case !errors.Is(err, ErrNoProvider):
+	case !isErr(err, ErrNoProvider):
 		return err
 	}
 	if err := accessMod.EnsureRoleFor(RoleAdmin, "Admin", "System administrator", []string{user.Id}); err != nil {
@@ -106,8 +104,7 @@ func (l LoginByRUT) buildIdentity(d Deps, logger func(...any)) (identity, error)
 	if l.IdleMinutes > 0 {
 		idleMinutes = l.IdleMinutes
 	} else if v := env.Get(EnvSessionIdleMinutes); v != "" {
-		var n int
-		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+		if n, err := fmt.Convert(v).Int(); err == nil && n > 0 {
 			idleMinutes = n
 		} else {
 			if logger != nil {
@@ -183,4 +180,21 @@ func (l LoginByRUT) build(d Deps, logger func(...any)) (serverAuth, error) {
 		APIModules: []router.APIModule{id.users},
 		Operations: []router.OperationModule{id.users, id.access},
 	}, nil
+}
+
+func isErr(err, target error) bool {
+	if err == target {
+		return true
+	}
+	if u, ok := err.(interface{ Unwrap() error }); ok {
+		return isErr(u.Unwrap(), target)
+	}
+	if u, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, e := range u.Unwrap() {
+			if isErr(e, target) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -1,9 +1,7 @@
 ---
 PLAN: "feat!: appkit is production only — migration and dev tools leave; Server/BuildServer take mounts; RunBrowser → Browser(app, tools)"
-EXECUTOR: jules
+EXECUTOR: ""
 REVIEWER: none
-STATUS: running
-SESSION: 12412985251714415200
 ---
 
 > Read AGENTS.md at the repo root before any change.

@@ -3,8 +3,6 @@
 package appkit
 
 import (
-	"webtyp.com/ddl"
-	"webtyp.com/erd"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -13,14 +11,14 @@ import (
 
 // ServerConfig is everything an app tells appkit about its server contracts.
 type ServerConfig struct {
-	Name       string                   // the app's name; MCP server name
-	Authorize  model.Authorizer         // nil = deny everything (and log it)
-	Policy     model.PolicyDescriber    // optional: role permissions description for /_routes
-	Operations []router.OperationModule // published at POST /api/<module>/<op>
-	MCPTools   []mcp.ToolName           // operations an agent may call; empty = MCP closed
-	APIModules []router.APIModule       // modules with their own routes (MountAPI)
-	Register   func(r router.Router)    // the app's own routes; nil = none
-	Migrations []ddl.Step               // the app's migrations, in order; non-empty → GET /_schema (db_schema:read) serves its database diagram
+	Name       string                                                     // the app's name; MCP server name
+	Authorize  model.Authorizer                                           // nil = deny everything (and log it)
+	Policy     model.PolicyDescriber                                      // optional: role permissions description for /_routes
+	Operations []router.OperationModule                                   // published at POST /api/<module>/<op>
+	MCPTools   []mcp.ToolName                                             // operations an agent may call; empty = MCP closed
+	APIModules []router.APIModule                                         // modules with their own routes (MountAPI)
+	Mounts     []func(r router.Router, policy model.PolicyDescriber) error // extra routes the app's main passes (dev tools); nil = none
+	Register   func(r router.Router)                                      // the app's own routes; nil = none
 	Logger     func(...any)
 }
 
@@ -50,19 +48,15 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	}
 	mcpServer.MountAPI(r)
 
-	router.MountIntrospection(r, router.IntrospectionPath, cfg.Policy).Requires(router.ResourceIntrospection, model.Read)
-
-	if len(cfg.Migrations) > 0 {
-		diagram, err := erd.ReadSteps(cfg.Migrations...)
-		if err != nil {
-			return err
-		}
-		erd.Mount(r, erd.SchemaPath, diagram).Requires(erd.ResourceSchema, model.Read)
-	}
-
 	for _, m := range cfg.APIModules {
 		if m != nil {
 			m.MountAPI(r)
+		}
+	}
+
+	for _, mount := range cfg.Mounts {
+		if err := mount(r, cfg.Policy); err != nil {
+			return err
 		}
 	}
 

@@ -3,10 +3,10 @@
 package appkit
 
 import (
-	"fmt"
-
 	"webtyp.com/env"
 	eventsmock "webtyp.com/events/mock"
+	"webtyp.com/fmt"
+	"webtyp.com/model"
 	"webtyp.com/orm"
 	"webtyp.com/router"
 	"webtyp.com/server/httpd"
@@ -41,7 +41,7 @@ func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router
 		}
 		built, err := m.Server.Build(*d)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", m.Name, err)
+			return nil, nil, fmt.ErrType(fmt.Err(m.Name), err)
 		}
 		d.built = append(d.built, built)
 		if o, ok := built.(router.OperationModule); ok {
@@ -58,7 +58,7 @@ func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router
 // App.Modules order, auth, and every contract MountServer mounts.
 //
 //	srv, err := appkit.BuildServer(config.App, appkit.ServerEnv{Port: "8080"})
-func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
+func BuildServer(app App, se ServerEnv, mounts ...func(r router.Router, policy model.PolicyDescriber) error) (*httpd.Server, error) {
 	logger := loggerOf(app)
 	ids, err := unixid.NewUnixID()
 	if err != nil {
@@ -96,7 +96,7 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 		switch l := app.Login.(type) {
 		case LoginByRUT:
 			if au, err = l.build(d, logger); err != nil {
-				return nil, fmt.Errorf("login: %w", err)
+				return nil, fmt.ErrType(fmt.Err("login"), err)
 			}
 		}
 	}
@@ -116,8 +116,8 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 		Operations: append(ops, au.Operations...),
 		MCPTools:   app.Server.MCPTools,
 		APIModules: append(apis, au.APIModules...),
+		Mounts:     mounts,
 		Register:   app.Server.Routes,
-		Migrations: Steps(app),
 		Logger:     logger,
 	}); err != nil {
 		return nil, err
@@ -130,8 +130,10 @@ func BuildServer(app App, se ServerEnv) (*httpd.Server, error) {
 
 // Server reads the process arguments and DATABASE_URL, builds the server and
 // listens. It is the whole body of an app's web/server/main.go.
-func Server(app App) error {
-	srv, err := BuildServer(app, processEnv())
+//
+//	func main() { if err := appkit.Server(config.App, devtools.Server(config.App)...); err != nil { log.Fatal(err) } }
+func Server(app App, mounts ...func(r router.Router, policy model.PolicyDescriber) error) error {
+	srv, err := BuildServer(app, processEnv(), mounts...)
 	if err != nil {
 		return err
 	}
