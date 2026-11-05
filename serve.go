@@ -35,8 +35,12 @@ type ServerEnv struct {
 // buildModules builds app.Modules in order on d.DB, appending each to d.built (so later modules Find it).
 // It returns the operation and API modules among them, for BuildServer to mount.
 func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router.APIModule, err error) {
+	if d.built == nil {
+		builtSlice := make([]model.ModuleNaming, 0, len(app.Modules))
+		d.built = &builtSlice
+	}
 	appendBuilt := func(v model.ModuleNaming) {
-		d.built = append(d.built, v)
+		*d.built = append(*d.built, v)
 		if o, ok := v.(router.OperationModule); ok {
 			ops = append(ops, o)
 		}

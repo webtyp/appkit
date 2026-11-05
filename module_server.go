@@ -2,6 +2,8 @@ package appkit
 
 import (
 	"errors"
+	"reflect"
+
 	"webtyp.com/events"
 	"webtyp.com/fmt"
 	"webtyp.com/model"
@@ -45,7 +47,7 @@ type Deps struct {
 	TenantID string
 	Zone     time.Zone // the installation's zone (App.Timezone), loaded once: every local date and hour comes from it
 
-	built []model.ModuleNaming
+	built *[]model.ModuleNaming
 }
 
 // Find returns the one module built so far that satisfies T, so a module asks
@@ -55,18 +57,21 @@ type Deps struct {
 func Find[T any](d Deps) (T, error) {
 	var found, zero T
 	n := 0
-	for _, m := range d.built {
-		if v, ok := m.(T); ok {
-			found = v
-			n++
+	if d.built != nil {
+		for _, m := range *d.built {
+			if v, ok := m.(T); ok {
+				found = v
+				n++
+			}
 		}
 	}
+	typeName := reflect.TypeOf((*T)(nil)).Elem().String()
 	switch n {
 	case 0:
-		return zero, fmt.ErrType(ErrNoProvider, fmt.Errf("%T", &zero))
+		return zero, fmt.ErrType(ErrNoProvider, errors.New(typeName))
 	case 1:
 		return found, nil
 	default:
-		return zero, fmt.ErrType(ErrManyProviders, fmt.Errf("%T", &zero))
+		return zero, fmt.ErrType(ErrManyProviders, errors.New(typeName))
 	}
 }
