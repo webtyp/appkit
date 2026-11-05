@@ -1,3 +1,4 @@
+
 //go:build !wasm
 
 package tests
@@ -7,13 +8,25 @@ import (
 	"strings"
 	"testing"
 
-	"webtyp.com/access"
 	"webtyp.com/appkit"
-	"webtyp.com/auth/authority"
 	"webtyp.com/model"
 	"webtyp.com/orm"
 	"webtyp.com/storage/mem"
 )
+
+type dummyMod struct{}
+func (dummyMod) ModelName() string { return "dummy" }
+
+type partItem struct{ name string }
+
+func (p partItem) ModelName() string { return p.name }
+
+type partsMod struct{}
+
+func (partsMod) ModelName() string { return "parts_mod" }
+func (partsMod) Parts() []model.ModuleNaming {
+	return []model.ModuleNaming{partItem{"p1"}, partItem{"p2"}}
+}
 
 func TestBuildModules_NilDB(t *testing.T) {
 	_, err := appkit.BuildModules(appkit.App{Timezone: "America/Santiago", TenantID: "t"}, nil)
@@ -24,7 +37,7 @@ func TestBuildModules_NilDB(t *testing.T) {
 
 func TestBuildModules_FindsAppModules(t *testing.T) {
 	trustedProvider := mod("trusted", func(d appkit.Deps) (model.ModuleNaming, error) {
-		return trustedIPMod{}, nil
+		return dummyMod{}, nil
 	})
 
 	app := appkit.App{Timezone: "America/Santiago",
@@ -38,20 +51,19 @@ func TestBuildModules_FindsAppModules(t *testing.T) {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
-	if _, err := appkit.Find[trustedIPMod](d); err != nil {
-		t.Fatalf("expected to find trustedIPMod, got %v", err)
+	if _, err := appkit.Find[dummyMod](d); err != nil {
+		t.Fatalf("expected to find dummyMod, got %v", err)
 	}
 }
 
-func TestBuildModules_LoginAddsPeople(t *testing.T) {
-	trustedProvider := mod("trusted", func(d appkit.Deps) (model.ModuleNaming, error) {
-		return trustedIPMod{}, nil
+func TestBuildModules_PartsAddsAllParts(t *testing.T) {
+	partsProvider := mod("parts", func(d appkit.Deps) (model.ModuleNaming, error) {
+		return partsMod{}, nil
 	})
 
 	app := appkit.App{Timezone: "America/Santiago",
 		TenantID: "t",
-		Login:    appkit.LoginByRUT{},
-		Modules:  []appkit.Module{trustedProvider},
+		Modules:  []appkit.Module{partsProvider},
 	}
 	db := orm.New(mem.New())
 
@@ -60,11 +72,11 @@ func TestBuildModules_LoginAddsPeople(t *testing.T) {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
-	if _, err := appkit.Find[*authority.Module](d); err != nil {
-		t.Fatalf("expected to find *authority.Module, got %v", err)
-	}
-	if _, err := appkit.Find[*access.Module](d); err != nil {
-		t.Fatalf("expected to find *access.Module, got %v", err)
+	if _, err := appkit.Find[partItem](d); err == nil {
+		// should find multiple parts since there are 2 partItem values
+		t.Fatalf("expected ErrManyProviders for partItem, got nil error")
+	} else if !errors.Is(err, appkit.ErrManyProviders) {
+		t.Fatalf("expected ErrManyProviders, got %v", err)
 	}
 }
 
@@ -83,10 +95,8 @@ func TestBuildModules_ModuleErrorNamed(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if err.Error() != "bad: boom" {
-		if !strings.Contains(err.Error(), "bad: boom") {
-			t.Fatalf("expected error containing 'bad: boom', got %q", err.Error())
-		}
+	if !strings.Contains(err.Error(), "bad: boom") {
+		t.Fatalf("expected error containing 'bad: boom', got %q", err.Error())
 	}
 }
 
@@ -101,16 +111,16 @@ func TestBuildModules_BadTimezone(t *testing.T) {
 
 func TestBuildModules_ZoneInDeps(t *testing.T) {
 	var zoneName string
-	mod := appkit.Module{
+	m := appkit.Module{
 		Name: "zone_reader",
 		Server: appkit.ModuleServer{
 			Build: func(d appkit.Deps) (model.ModuleNaming, error) {
 				zoneName = d.Zone.Name()
-				return trustedIPMod{}, nil
+				return dummyMod{}, nil
 			},
 		},
 	}
-	app := appkit.App{Timezone: "America/Santiago", Modules: []appkit.Module{mod}}
+	app := appkit.App{Timezone: "America/Santiago", Modules: []appkit.Module{m}}
 	db := orm.New(mem.New())
 	_, err := appkit.BuildModules(app, db)
 	if err != nil {

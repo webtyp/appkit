@@ -2,13 +2,12 @@ package appkit
 
 // App is the whole application, for both binaries: web/server and web/browser read the same value.
 //
-//	var App = appkit.App{TenantID: "acme", Brand: Brand, Modules: []appkit.Module{catalog.Module}, Login: appkit.LoginByRUT{}, Server: server}
+//	var App = appkit.App{TenantID: "acme", Brand: Brand, Modules: []appkit.Module{access.Module, catalog.Module}, Server: server}
 type App struct {
 	TenantID string       // the installation: every module's tenant, the rbac project and the MCP server name
 	Timezone string       // the installation's zone (IANA name), reaches modules as Deps.Zone / BrowserDeps.Zone
 	Brand    Brand        // name and logo on the access screen and the chassis
-	Modules  []Module     // build, migration and menu order; the first screen is the one opened first
-	Login    Login        // how people enter; nil = nobody: every operation is denied
+	Modules  []Module     // build, migration and menu order; the entry module goes first: appkit.Find finds it among the built modules
 	Server   AppServer    // what only the server binary needs; the app fills it from a !browser file, zero in the browser
 	Log      func(...any) // nil = discard
 }
@@ -21,18 +20,3 @@ type Module struct {
 	Server  ModuleServer  // the module fills it from a !browser file; zero in the browser
 	Browser ModuleBrowser // the module fills it from a browser file; zero on the server
 }
-
-// Login is how people enter the app. Only appkit implements it: today LoginByRUT.
-type Login interface{ loginMethod() }
-
-// LoginByRUT is entry by RUT from a device the installation knows (trusted IP), with first-administrator setup.
-//
-//	Login: appkit.LoginByRUT{}
-type LoginByRUT struct {
-	IdleMinutes int // session idle lock; 0 = SESSION_IDLE_MINUTES or 30
-}
-
-func (LoginByRUT) loginMethod() {}
-
-// defaultIdleMinutes is the session idle lock when LoginByRUT.IdleMinutes is 0 (and, on the server, SESSION_IDLE_MINUTES is unset).
-const defaultIdleMinutes = 30

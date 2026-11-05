@@ -39,12 +39,12 @@ was listed twice and the browser main referenced a symbol gopls could not see.
 Build order is `App.Modules` order; `Find` sees only modules built before it. The zone is loaded once by appkit; modules never load it. No database means no module built (the
 server still serves static files). Database migrations live in `webtyp.com/migrate` and dev tools in `webtyp.com/devtools`.
 
-One construction path: `buildModules` and `buildIdentity` are shared by `BuildServer` and `BuildModules`; server-only files.
+One construction path: `buildModules` is shared by `BuildServer` and `BuildModules`; server-only files.
 
-## Login
+## Entry
 
-`Login` is closed (an unexported method): only appkit implements it. `LoginByRUT` builds `authority`, `rbac` and
-`access` after the modules, finds the `auth.TrustedIPStore` among them, and creates the first administrator: user,
-RUT identity, optional `FirstAdminRegistrar` (device and record, owned by a domain module), `admin` role with the
-wildcard permission. Brand `RenderPages`/`RenderHTML` are read by sitec from the app's `var Brand`; a zero `Brand`
-renders nothing.
+Entry is a module in `App.Modules` (`webtyp.com/access/module`). On the server, `appkit.Find[appkit.Entry]`
+finds it among built modules and obtains `Authn`, `Authorize` and `Policy`. If no entry module is present,
+operations are denied by default (`DenyAll`). If the entry module builds multiple domain parts (users, access),
+it implements `Parts` so that `appkit.Find`, operations and API routes discover them as if they were top-level modules.
+In the browser, the entry module sets `ModuleBrowser.Entry` returning `EntryScreens` (`Login`, `Setup`, `IdleSeconds`).

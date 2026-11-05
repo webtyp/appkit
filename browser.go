@@ -3,18 +3,13 @@
 package appkit
 
 import (
-	accessui "webtyp.com/access/ui"
 	"webtyp.com/auth"
 	"webtyp.com/components/usermenu"
 	. "webtyp.com/dom"
 	"webtyp.com/fetch"
-	"webtyp.com/fmt"
-	"webtyp.com/form"
 	. "webtyp.com/html"
-	"webtyp.com/json"
 	"webtyp.com/lang"
 	appmenu "webtyp.com/layout/app"
-	"webtyp.com/layout/login"
 	"webtyp.com/layout/platformd"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -44,25 +39,22 @@ type session struct {
 	showLogin       *SignalBool
 	isAuthenticated *SignalBool
 	platform        *platformd.Platform
-	loginForm       *form.Form
-	setupForm       *form.Form
-	loginMessage    *SignalString
-	setupMessage    *SignalString
+	entryScreens    EntryScreens
 }
 
 func (s *session) Render() *Element {
 	setupView := Show(s.needsSetup, func() *Element {
-		return (&login.Login{
-			Title:    lang.Text(s.brand.Name),
-			Subtitle: "First setup: create the administrator",
-			Form:     s.setupForm.Render(),
-			LogoMark: s.brand.LogoMark,
-			Message:  s.setupMessage,
-		}).Render()
+		if s.entryScreens.Setup != nil {
+			return s.entryScreens.Setup
+		}
+		return Div()
 	})
-	loginScreen := LoginScreen(s.brand, s.loginForm)
-	loginScreen.Message = s.loginMessage
-	loginView := Show(s.showLogin, func() *Element { return loginScreen.Render() })
+	loginView := Show(s.showLogin, func() *Element {
+		if s.entryScreens.Login != nil {
+			return s.entryScreens.Login
+		}
+		return Div()
+	})
 	// The chassis is built with the profile already known: platformd filters
 	// the screens during its render, and Show renders its content only once.
 	platformView := Show(s.isAuthenticated, func() *Element { return s.platform.Render() })
@@ -80,18 +72,27 @@ func reload() { Navigate("") }
 
 func logout() { fetch.Post(auth.PathLogout).Send(func(*fetch.Response, error) { reload() }) }
 
-// idleSeconds is the client idle lock of the app's login: LoginByRUT.IdleMinutes, else 30 minutes.
-func idleSeconds(l Login) int {
-	if r, ok := l.(LoginByRUT); ok && r.IdleMinutes > 0 {
-		return r.IdleMinutes * 60
-	}
-	return defaultIdleMinutes * 60
-}
-
 func buildSession(app App, caller router.Caller, tools appmenu.Tools) *session {
 	ids, err := unixid.NewUnixID()
 	if err != nil {
 		panic(err) // NewUnixID never fails in the browser
+	}
+
+	zone, err := time.LoadZone(app.Timezone)
+	if err != nil {
+		panic(err)
+	}
+
+	var entryScreens EntryScreens
+	var hasEntry bool
+	for _, m := range app.Modules {
+		if m.Browser.Entry != nil {
+			if hasEntry {
+				panic("appkit: two entry modules — only one module may set ModuleBrowser.Entry")
+			}
+			entryScreens = m.Browser.Entry(BrowserDeps{Caller: caller, Zone: zone, Brand: app.Brand})
+			hasEntry = true
+		}
 	}
 
 	// Who the user is comes first: blocking here is valid because Browser is
@@ -142,7 +143,10 @@ func buildSession(app App, caller router.Caller, tools appmenu.Tools) *session {
 
 	idle := 0
 	if authenticated {
-		idle = idleSeconds(app.Login)
+		idle = entryScreens.IdleSeconds
+		if idle <= 0 {
+			idle = 30 * 60
+		}
 	}
 	p := &platformd.Platform{
 		AppName: app.Brand.Name,
@@ -158,79 +162,10 @@ func buildSession(app App, caller router.Caller, tools appmenu.Tools) *session {
 		OnIdle:      logout,
 	}
 
-	loginMessage := NewString("")
-	if errScreens != nil {
-		loginMessage.Set(errScreens.Error())
-	}
-	setupMessage := NewString("")
-
-	rutData := &auth.RUTLoginData{}
-	loginForm, err := LoginForm(rutData, ids)
-	if err == nil {
-		loginForm.OnSubmit(func(fd model.Fielder, done func(error)) {
-			post(auth.PathLoginRUT, rutData, done, func() {
-				msg := lang.Translate(textLoginDenied).String()
-				loginMessage.Set(msg)
-				done(fmt.Err(msg))
-			})
-		})
-	}
-
-	// The setup field is not masked: the person declares their own RUT and must
-	// be able to read it back before confirming.
-	setupData := &auth.SetupData{}
-	setupForm, errSetup := form.New("setup-wrapper", setupData, ids)
-	if errSetup == nil {
-		if inp := setupForm.Input("code"); inp != nil {
-			if titler, ok := inp.(interface{ SetTitle(string) }); ok {
-				titler.SetTitle(labelRUT)
-			}
-			// The server validates the RUT; the client charset rejects "-".
-			if setter, ok := inp.(interface{ SetSkipValidation(bool) }); ok {
-				setter.SetSkipValidation(true)
-			}
-		}
-		if inp := setupForm.Input("name"); inp != nil {
-			if titler, ok := inp.(interface{ SetTitle(string) }); ok {
-				titler.SetTitle(lang.Translate(textName).String())
-			}
-		}
-		setupForm.SubmitLabel(lang.Translate(textCreateAdmin).String())
-		setupForm.OnSubmit(func(fd model.Fielder, done func(error)) {
-			post(auth.PathSetup, setupData, done, func() {
-				msg := lang.Translate(textSetupFailed).String()
-				setupMessage.Set(msg)
-				done(fmt.Err(msg))
-			})
-		})
-	}
-
 	return &session{
 		brand: app.Brand, needsSetup: needsSetup, showLogin: showLogin, isAuthenticated: isAuthenticated,
-		platform: p, loginForm: loginForm, setupForm: setupForm,
-		loginMessage: loginMessage, setupMessage: setupMessage,
+		platform: p, entryScreens: entryScreens,
 	}
-}
-
-// post sends data as JSON to path: 200 reloads the page, any other status calls refused.
-func post(path string, data model.Encodable, done func(error), refused func()) {
-	var out []byte
-	if err := json.Encode(data, &out); err != nil {
-		done(err)
-		return
-	}
-	fetch.Post(path).ContentTypeJSON().Body(out).Send(func(resp *fetch.Response, err error) {
-		if err != nil {
-			done(err)
-			return
-		}
-		if resp.Status != 200 {
-			refused()
-			return
-		}
-		reload()
-		done(nil)
-	})
 }
 
 type emptyArgs struct{}
@@ -240,8 +175,7 @@ func (emptyArgs) EncodeFields(w model.FieldWriter) {}
 func (emptyArgs) DecodeFields(r model.FieldReader) {}
 func (emptyArgs) Validate(action byte) error       { return nil }
 
-// Screens are the menu's screens: each module's in App.Modules order (the first one opens
-// first), then the login's own (people and roles, from access, for LoginByRUT).
+// Screens are the menu's screens: each module's in App.Modules order (the first one opens first).
 //
 //	screens := appkit.Screens(config.App, caller)
 func Screens(app App, caller router.Caller) ([]view.Screen, error) {
@@ -249,16 +183,13 @@ func Screens(app App, caller router.Caller) ([]view.Screen, error) {
 	if err != nil {
 		return nil, ErrNoTimezone
 	}
-	d := BrowserDeps{Caller: caller, Zone: zone}
+	d := BrowserDeps{Caller: caller, Zone: zone, Brand: app.Brand}
 
 	var out []view.Screen
 	for _, m := range app.Modules {
 		if m.Browser.Screens != nil {
 			out = append(out, m.Browser.Screens(d)...)
 		}
-	}
-	if _, ok := app.Login.(LoginByRUT); ok {
-		out = append(out, accessui.Screens(caller)...)
 	}
 	return out, nil
 }

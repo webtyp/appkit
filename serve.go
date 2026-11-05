@@ -35,6 +35,15 @@ type ServerEnv struct {
 // buildModules builds app.Modules in order on d.DB, appending each to d.built (so later modules Find it).
 // It returns the operation and API modules among them, for BuildServer to mount.
 func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router.APIModule, err error) {
+	appendBuilt := func(v model.ModuleNaming) {
+		d.built = append(d.built, v)
+		if o, ok := v.(router.OperationModule); ok {
+			ops = append(ops, o)
+		}
+		if a, ok := v.(router.APIModule); ok {
+			apis = append(apis, a)
+		}
+	}
 	for _, m := range app.Modules {
 		if m.Server.Build == nil {
 			continue
@@ -43,12 +52,11 @@ func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router
 		if err != nil {
 			return nil, nil, fmt.ErrType(fmt.Err(m.Name), err)
 		}
-		d.built = append(d.built, built)
-		if o, ok := built.(router.OperationModule); ok {
-			ops = append(ops, o)
-		}
-		if a, ok := built.(router.APIModule); ok {
-			apis = append(apis, a)
+		appendBuilt(built)
+		if p, ok := built.(Parts); ok {
+			for _, part := range p.Parts() {
+				appendBuilt(part)
+			}
 		}
 	}
 	return ops, apis, nil
@@ -91,31 +99,40 @@ func BuildServer(app App, se ServerEnv, mounts ...func(r router.Router, policy m
 		}
 	}
 
-	var au serverAuth
+	var (
+		authn     router.Middleware
+		authorize = DenyAll(logger)
+		policy    model.PolicyDescriber
+	)
 	if d.DB != nil {
-		switch l := app.Login.(type) {
-		case LoginByRUT:
-			if au, err = l.build(d, logger); err != nil {
-				return nil, fmt.ErrType(fmt.Err("login"), err)
+		entry, err := Find[Entry](d)
+		if err != nil {
+			if isErr(err, ErrNoProvider) {
+				logger("appkit: no entry module — every operation is denied")
+			} else {
+				return nil, fmt.ErrType(fmt.Err("entry"), err)
 			}
+		} else {
+			authn = entry.Authn()
+			authorize = entry.Authorize()
+			policy = entry.Policy()
 		}
 	}
-	authorize := au.Authorize
 	if authorize == nil {
 		authorize = DenyAll(logger)
 	}
 
 	srv := httpd.New(httpd.Config{
 		Port: se.Port, PublicDir: se.PublicDir, Gzip: true, NoCache: se.NoCache, Health: true,
-		Logger: logger, Authn: au.Authn, Authorize: authorize, Policy: au.Policy,
+		Logger: logger, Authn: authn, Authorize: authorize, Policy: policy,
 	})
 	if err := MountServer(srv.Router(), ServerConfig{
 		Name:       app.TenantID,
 		Authorize:  authorize,
-		Policy:     au.Policy,
-		Operations: append(ops, au.Operations...),
+		Policy:     policy,
+		Operations: ops,
 		MCPTools:   app.Server.MCPTools,
-		APIModules: append(apis, au.APIModules...),
+		APIModules: apis,
 		Mounts:     mounts,
 		Register:   app.Server.Routes,
 		Logger:     logger,
@@ -154,4 +171,21 @@ func processEnv() ServerEnv {
 		se.PublicDir = httpd.DefaultPublicDir
 	}
 	return se
+}
+
+func isErr(err, target error) bool {
+	if err == target {
+		return true
+	}
+	if u, ok := err.(interface{ Unwrap() error }); ok {
+		return isErr(u.Unwrap(), target)
+	}
+	if u, ok := err.(interface{ Unwrap() []error }); ok {
+		for _, e := range u.Unwrap() {
+			if isErr(e, target) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -1,25 +1,39 @@
 package appkit
 
 import (
-	"webtyp.com/ddl"
+	"errors"
 	"webtyp.com/events"
 	"webtyp.com/fmt"
 	"webtyp.com/model"
 	"webtyp.com/orm"
+	"webtyp.com/router"
 	"webtyp.com/time"
 )
 
 // ErrNoProvider and ErrManyProviders are what Find returns when the modules
 // built so far hold zero or more than one value of the requested type.
 var (
-	ErrNoProvider    = fmt.Err("appkit: no module provides it — list the module that does before the one that needs it in App.Modules")
-	ErrManyProviders = fmt.Err("appkit: more than one module provides it — keep one in App.Modules")
-	ErrNoTimezone    = fmt.Err("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
+	ErrNoProvider    = errors.New("appkit: no module provides it — list the module that does before the one that needs it in App.Modules")
+	ErrManyProviders = errors.New("appkit: more than one module provides it — keep one in App.Modules")
+	ErrNoTimezone    = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
 )
 
 type ModuleServer struct {
-	Migrate func(conn ddl.Execer, compiler ddl.Compiler) error
-	Build   func(d Deps) (model.ModuleNaming, error)
+	Build func(d Deps) (model.ModuleNaming, error)
+}
+
+// Entry is how people enter the app; one module of App.Modules provides it. Without it every operation is denied.
+// Example: entry, err := appkit.Find[appkit.Entry](d)
+type Entry interface {
+	Authn() router.Middleware      // who the caller is (session)
+	Authorize() model.Authorizer   // what the caller may do
+	Policy() model.PolicyDescriber // which role opens each resource (API explorer)
+}
+
+// Parts lets one module build several values (people, roles, administration): appkit adds each part to the built
+// list, so Find, operations and API routes see them as if they were modules. Optional, asserted at the seam.
+type Parts interface {
+	Parts() []model.ModuleNaming
 }
 
 // Deps is what every module gets from appkit: the database, ids, events, the
@@ -55,10 +69,4 @@ func Find[T any](d Deps) (T, error) {
 	default:
 		return zero, fmt.ErrType(ErrManyProviders, fmt.Errf("%T", &zero))
 	}
-}
-
-// FirstAdminRegistrar is what a module offers to complete the first administrator (its device, its staff record).
-// Optional: with no module providing it, only the user and its role are created.
-type FirstAdminRegistrar interface {
-	RegisterFirstAdmin(userID, code, name, ip string) error
 }

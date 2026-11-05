@@ -3,42 +3,29 @@
 package tests
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
 	"webtyp.com/appkit"
 	"webtyp.com/model"
+	"webtyp.com/router"
 )
 
-func TestBuildServer_LoginNeedsTrustedIPStore(t *testing.T) {
-	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
-		Login:  appkit.LoginByRUT{},
-		Server: appkit.AppServer{Database: openMem},
-	}
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !errors.Is(err, appkit.ErrNoProvider) {
-		t.Fatalf("expected ErrNoProvider, got %v", err)
-	}
-}
+type dummyEntry struct{}
 
-type trustedIPMod struct{}
+func (dummyEntry) ModelName() string                  { return "dummy_entry" }
+func (dummyEntry) Authn() router.Middleware            { return nil }
+func (dummyEntry) Authorize() model.Authorizer         { return func(string, model.Resource, model.Action) bool { return true } }
+func (dummyEntry) Policy() model.PolicyDescriber       { return nil }
 
-func (trustedIPMod) ModelName() string                  { return "trusted" }
-func (trustedIPMod) IsTrustedIP(userID, ip string) bool { return true }
-
-func TestBuildServer_LoginByRUT(t *testing.T) {
-	trustedProvider := mod("trusted", func(d appkit.Deps) (model.ModuleNaming, error) {
-		return trustedIPMod{}, nil
+func TestBuildServer_WithEntryModule(t *testing.T) {
+	entryProvider := mod("entry", func(d appkit.Deps) (model.ModuleNaming, error) {
+		return dummyEntry{}, nil
 	})
 
 	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
-		Login:   appkit.LoginByRUT{},
 		Server:  appkit.AppServer{Database: openMem},
-		Modules: []appkit.Module{trustedProvider},
+		Modules: []appkit.Module{entryProvider},
 	}
 
 	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
@@ -47,26 +34,41 @@ func TestBuildServer_LoginByRUT(t *testing.T) {
 	}
 }
 
-func TestBrand_ZeroRendersNothing(t *testing.T) {
-	b := appkit.Brand{}
-	if pages := b.RenderPages(); pages != nil {
-		t.Errorf("expected nil pages, got %v", pages)
+func TestBuildServer_WithoutEntryModule(t *testing.T) {
+	var logged []string
+	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
+		Server:  appkit.AppServer{Database: openMem},
+		Log: func(args ...any) {
+			for _, a := range args {
+				logged = append(logged, a.(string))
+			}
+		},
 	}
-	if html := b.RenderHTML(); html != "" {
-		t.Errorf("expected empty html, got %q", html)
+
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	foundLog := false
+	for _, l := range logged {
+		if strings.Contains(l, "no entry module") {
+			foundLog = true
+			break
+		}
+	}
+	if !foundLog {
+		t.Fatalf("expected log about no entry module, got: %v", logged)
 	}
 }
 
-func TestBrand_RendersLogin(t *testing.T) {
+func TestBrand_RenderHTML(t *testing.T) {
 	b := appkit.Brand{Name: "Acme"}
-	pages := b.RenderPages()
-	if len(pages) != 1 {
-		t.Fatalf("expected 1 page, got %d", len(pages))
+	html := b.RenderHTML()
+	if !strings.Contains(html, "login__card") {
+		t.Fatalf("expected RenderHTML to contain login__card, got %q", html)
 	}
-	if pages[0].Path != "/" {
-		t.Errorf("expected Path '/', got %q", pages[0].Path)
-	}
-	if !strings.Contains(pages[0].Body, "Acme") {
-		t.Errorf("expected Body to contain 'Acme', got %q", pages[0].Body)
+	zero := appkit.Brand{}
+	if zero.RenderHTML() != "" {
+		t.Fatalf("expected zero brand RenderHTML to be empty, got %q", zero.RenderHTML())
 	}
 }

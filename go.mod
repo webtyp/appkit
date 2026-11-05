@@ -3,24 +3,19 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
-	webtyp.com/access v0.0.41
 	webtyp.com/auth v0.0.102
 	webtyp.com/components v0.8.57
-	webtyp.com/ddl v0.0.39
 	webtyp.com/dom v0.13.29
 	webtyp.com/env v0.1.3
 	webtyp.com/events v0.1.7
 	webtyp.com/fetch v0.1.29
 	webtyp.com/fmt v1.0.0
-	webtyp.com/form v0.4.61
 	webtyp.com/html v0.0.30
-	webtyp.com/json v0.5.37
 	webtyp.com/lang v0.1.11
 	webtyp.com/layout v0.3.99
 	webtyp.com/mcp v0.3.20
 	webtyp.com/model v0.2.13
 	webtyp.com/orm v0.12.25
-	webtyp.com/rbac v0.0.29
 	webtyp.com/router v0.4.17
 	webtyp.com/rpc v0.2.15
 	webtyp.com/server v0.2.105
@@ -49,15 +44,17 @@ require (
 	webtyp.com/calendar v0.1.0 // indirect
 	webtyp.com/color v0.1.2 // indirect
 	webtyp.com/context v0.0.23 // indirect
-	webtyp.com/crypto v0.0.30 // indirect
 	webtyp.com/css v0.4.31 // indirect
 	webtyp.com/dbus v0.1.1 // indirect
+	webtyp.com/ddl v0.0.39 // indirect
 	webtyp.com/erd v0.0.14 // indirect
 	webtyp.com/escape v0.1.0 // indirect
 	webtyp.com/filepath v0.1.0 // indirect
 	webtyp.com/font v0.0.5 // indirect
+	webtyp.com/form v0.4.61 // indirect
 	webtyp.com/icons v0.0.38 // indirect
 	webtyp.com/input v0.0.28 // indirect
+	webtyp.com/json v0.5.37 // indirect
 	webtyp.com/keyring v0.2.9 // indirect
 	webtyp.com/msgtype v0.1.0 // indirect
 	webtyp.com/pwa v0.2.13 // indirect
