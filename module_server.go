@@ -2,10 +2,8 @@ package appkit
 
 import (
 	"errors"
-	"reflect"
 
 	"webtyp.com/events"
-	"webtyp.com/fmt"
 	"webtyp.com/model"
 	"webtyp.com/orm"
 	"webtyp.com/router"
@@ -46,7 +44,6 @@ type Deps struct {
 	Events   events.Publisher
 	TenantID string
 	Zone     time.Zone // the installation's zone (App.Timezone), loaded once: every local date and hour comes from it
-	Log      func(...any)
 
 	built *[]model.ModuleNaming
 }
@@ -56,38 +53,22 @@ type Deps struct {
 //
 //	cats, err := appkit.Find[roomlayout.CategorySource](d)
 func Find[T any](d Deps) (T, error) {
-	return FindExcept[T](d)
-}
-
-// FindExcept returns the one module built so far satisfying T, skipping any module in skip.
-func FindExcept[T any](d Deps, skip ...any) (T, error) {
 	var found, zero T
 	n := 0
 	if d.built != nil {
 		for _, m := range *d.built {
-			skipped := false
-			for _, s := range skip {
-				if m == s {
-					skipped = true
-					break
-				}
-			}
-			if skipped {
-				continue
-			}
 			if v, ok := m.(T); ok {
 				found = v
 				n++
 			}
 		}
 	}
-	typeName := reflect.TypeOf((*T)(nil)).Elem().String()
 	switch n {
 	case 0:
-		return zero, fmt.ErrType(ErrNoProvider, errors.New(typeName))
+		return zero, ErrNoProvider
 	case 1:
 		return found, nil
 	default:
-		return zero, fmt.ErrType(ErrManyProviders, errors.New(typeName))
+		return zero, ErrManyProviders
 	}
 }
