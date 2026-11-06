@@ -3,7 +3,7 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
-	webtyp.com/auth v0.0.102
+	webtyp.com/auth v0.0.109
 	webtyp.com/components v0.8.57
 	webtyp.com/ddl v0.0.46
 	webtyp.com/dom v0.13.29
