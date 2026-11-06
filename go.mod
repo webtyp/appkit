@@ -46,7 +46,7 @@ require (
 	webtyp.com/context v0.0.23 // indirect
 	webtyp.com/css v0.4.31 // indirect
 	webtyp.com/dbus v0.1.1 // indirect
-	webtyp.com/ddl v0.0.39 // indirect
+	webtyp.com/ddl v0.0.46 // indirect
 	webtyp.com/erd v0.0.14 // indirect
 	webtyp.com/escape v0.1.0 // indirect
 	webtyp.com/filepath v0.1.0 // indirect
