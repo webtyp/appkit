@@ -76,11 +76,14 @@ the installation's clock. Empty or unknown → the app does not start (`ErrNoTim
 
 ```go
 // web/server/main.go
-func main() { if err := appkit.Server(config.App, devtools.Server(config.Migrations...)...); err != nil { log.Fatal(err) } }
+func main() { if err := appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...); err != nil { log.Fatal(err) } }
 
 // web/browser/main.go
 func main() { appkit.Browser(config.App, devtools.Menu()) }
 ```
+
+`config.Schema` (generated: every module's migration plus `config/removed.go`) lets the server log, at every start,
+each column the models no longer have but that still holds data — it never drops one ([serve.go](serve.go)).
 
 Import steps build the modules on their transaction with `BuildModules`:
 

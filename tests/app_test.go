@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/ddl"
 	"webtyp.com/model"
 	"webtyp.com/storage"
 	"webtyp.com/storage/mem"
@@ -59,7 +60,7 @@ func TestFind_OneProvider(t *testing.T) {
 		Modules: []appkit.Module{provider, consumer},
 	}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -80,7 +81,7 @@ func TestFind_NoProvider(t *testing.T) {
 		Modules: []appkit.Module{consumer},
 	}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -107,7 +108,7 @@ func TestFind_ProviderAfterConsumer(t *testing.T) {
 		Modules: []appkit.Module{consumer, provider},
 	}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -134,7 +135,7 @@ func TestFind_TwoProviders(t *testing.T) {
 		Modules: []appkit.Module{provider, provider2, consumer},
 	}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -160,7 +161,7 @@ func TestBuildServer_NoDSN(t *testing.T) {
 		Modules: []appkit.Module{provider},
 	}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{}, ddl.Schema{})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -173,7 +174,7 @@ func TestBuildServer_DSNWithoutOpen(t *testing.T) {
 	calls = nil
 	app := appkit.App{Timezone: "America/Santiago"}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"}, ddl.Schema{})
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -184,7 +185,7 @@ func TestBuildServer_DSNWithoutOpen(t *testing.T) {
 
 func TestBuildServer_NoTimezone(t *testing.T) {
 	app := appkit.App{}
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{})
 	if !errors.Is(err, appkit.ErrNoTimezone) {
 		t.Fatalf("expected ErrNoTimezone, got %v", err)
 	}

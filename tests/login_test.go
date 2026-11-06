@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/ddl"
 	"webtyp.com/model"
 	"webtyp.com/router"
 )
@@ -28,7 +29,7 @@ func TestBuildServer_WithEntryModule(t *testing.T) {
 		Modules: []appkit.Module{entryProvider},
 	}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"}, ddl.Schema{})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -45,7 +46,7 @@ func TestBuildServer_WithoutEntryModule(t *testing.T) {
 		},
 	}
 
-	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"})
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"}, ddl.Schema{})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

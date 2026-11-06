@@ -3,6 +3,7 @@
 package appkit
 
 import (
+	"webtyp.com/ddl"
 	"webtyp.com/env"
 	eventsmock "webtyp.com/events/mock"
 	"webtyp.com/fmt"
@@ -10,6 +11,7 @@ import (
 	"webtyp.com/orm"
 	"webtyp.com/router"
 	"webtyp.com/server/httpd"
+	"webtyp.com/storage"
 	"webtyp.com/time"
 	"webtyp.com/unixid"
 )
@@ -22,6 +24,18 @@ const (
 )
 
 const msgNoDatabase = "appkit: DATABASE_URL is not set — starting without a database; modules are not built"
+
+// Leftover column lines (D5): production never drops a column with data, it says so at every start.
+const (
+	msgLeftover         = "appkit: leftover column, the models no longer have it but it holds data:"
+	msgLeftoverRows     = "rows:"
+	msgLeftoverMore     = "or more"
+	msgLeftoverMovedTo  = "copied to:"
+	msgLeftoverNote     = "note:"
+	msgLeftoversSkipped = "appkit: leftover columns not checked:"
+	msgNoDDLCompiler    = "the database connection does not implement ddl.Compiler"
+	columnSeparator     = "."
+)
 
 // ServerEnv is what the process tells the server: where to listen, what to
 // serve and which database to open ("" = none).
@@ -69,8 +83,11 @@ func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router
 // BuildServer builds the whole server without listening: database, modules in
 // App.Modules order, auth, and every contract MountServer mounts.
 //
-//	srv, err := appkit.BuildServer(config.App, appkit.ServerEnv{Port: "8080"})
-func BuildServer(app App, se ServerEnv, mounts ...func(r router.Router, policy model.PolicyDescriber) error) (*httpd.Server, error) {
+// With a database it also logs, one line each, the columns schema's models no longer have but that still hold
+// data; it never drops them and never refuses to start.
+//
+//	srv, err := appkit.BuildServer(config.App, appkit.ServerEnv{Port: "8080"}, config.Schema)
+func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r router.Router, policy model.PolicyDescriber) error) (*httpd.Server, error) {
 	logger := loggerOf(app)
 	ids, err := unixid.NewUnixID()
 	if err != nil {
@@ -93,6 +110,7 @@ func BuildServer(app App, se ServerEnv, mounts ...func(r router.Router, policy m
 			return nil, err
 		}
 		d.DB = orm.New(conn)
+		warnLeftovers(conn, schema, logger)
 	}
 
 	var ops []router.OperationModule
@@ -152,13 +170,49 @@ func BuildServer(app App, se ServerEnv, mounts ...func(r router.Router, policy m
 // Server reads the process arguments and DATABASE_URL, builds the server and
 // listens. It is the whole body of an app's web/server/main.go.
 //
-//	func main() { if err := appkit.Server(config.App, devtools.Server(config.App)...); err != nil { log.Fatal(err) } }
-func Server(app App, mounts ...func(r router.Router, policy model.PolicyDescriber) error) error {
-	srv, err := BuildServer(app, processEnv(), mounts...)
+//	func main() { if err := appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...); err != nil { log.Fatal(err) } }
+func Server(app App, schema ddl.Schema, mounts ...func(r router.Router, policy model.PolicyDescriber) error) error {
+	srv, err := BuildServer(app, processEnv(), schema, mounts...)
 	if err != nil {
 		return err
 	}
 	return srv.ListenAndServe()
+}
+
+// warnLeftovers logs each column the database keeps although no model of schema has it, because it holds data
+// (ddl.Leftovers, read-only). A database that cannot be checked is logged too; neither stops the server.
+func warnLeftovers(conn storage.Conn, schema ddl.Schema, logger func(...any)) {
+	if len(schema.Steps) == 0 {
+		return
+	}
+	compiler, ok := conn.(ddl.Compiler)
+	if !ok {
+		logger(msgLeftoversSkipped, msgNoDDLCompiler)
+		return
+	}
+	tables, err := ddl.Capture(schema.Steps)
+	if err != nil {
+		logger(msgLeftoversSkipped, err)
+		return
+	}
+	left, err := ddl.New(conn, compiler).Leftovers(tables, schema.Removed)
+	if err != nil {
+		logger(msgLeftoversSkipped, err)
+		return
+	}
+	for _, l := range left {
+		line := []any{msgLeftover, l.Table + columnSeparator + l.Column, msgLeftoverRows, l.Rows}
+		if l.More {
+			line = append(line, msgLeftoverMore)
+		}
+		if l.Removed.MovedTo != "" {
+			line = append(line, msgLeftoverMovedTo, l.Removed.MovedTo)
+		}
+		if l.Removed.Note != "" {
+			line = append(line, msgLeftoverNote, l.Removed.Note)
+		}
+		logger(line...)
+	}
 }
 
 func processEnv() ServerEnv {

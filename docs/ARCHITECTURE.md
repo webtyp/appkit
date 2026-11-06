@@ -41,6 +41,11 @@ server still serves static files). Database migrations live in `webtyp.com/migra
 
 One construction path: `buildModules` is shared by `BuildServer` and `BuildModules`; server-only files.
 
+Leftover columns: `BuildServer` receives the app's `ddl.Schema` and, once the database is open, logs one line per
+column its models no longer have but that still holds data (`ddl.Leftovers`, read-only). Production never drops a
+column — that is a person's decision in `webtyp dev` (`migrate -drop`) — and a database that cannot be checked is
+logged, never a reason not to start.
+
 ## Entry
 
 Entry is a module in `App.Modules` (`webtyp.com/access/module`). On the server, `appkit.Find[appkit.Entry]`
