@@ -12,7 +12,7 @@ require (
 	webtyp.com/fetch v0.1.29
 	webtyp.com/fmt v1.0.0
 	webtyp.com/html v0.0.30
-	webtyp.com/lang v0.1.12
+	webtyp.com/lang v0.1.13
 	webtyp.com/layout v0.3.99
 	webtyp.com/mcp v0.3.20
 	webtyp.com/model v0.2.13
