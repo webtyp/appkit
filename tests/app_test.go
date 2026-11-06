@@ -10,6 +10,7 @@ import (
 	"webtyp.com/appkit"
 	"webtyp.com/ddl"
 	"webtyp.com/model"
+	"webtyp.com/orm"
 	"webtyp.com/storage"
 	"webtyp.com/storage/mem"
 )
@@ -55,7 +56,7 @@ func TestFind_OneProvider(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, consumer},
 	}
@@ -76,7 +77,7 @@ func TestFind_NoProvider(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer},
 	}
@@ -103,7 +104,7 @@ func TestFind_ProviderAfterConsumer(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{consumer, provider},
 	}
@@ -130,7 +131,7 @@ func TestFind_TwoProviders(t *testing.T) {
 		return consumerMod{src}, err
 	})
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider, provider2, consumer},
 	}
@@ -156,7 +157,7 @@ func TestBuildServer_NoDSN(t *testing.T) {
 		},
 	}
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{provider},
 	}
@@ -172,7 +173,7 @@ func TestBuildServer_NoDSN(t *testing.T) {
 
 func TestBuildServer_DSNWithoutOpen(t *testing.T) {
 	calls = nil
-	app := appkit.App{Timezone: "America/Santiago"}
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago"}
 
 	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"}, ddl.Schema{})
 	if err == nil {
@@ -184,9 +185,19 @@ func TestBuildServer_DSNWithoutOpen(t *testing.T) {
 }
 
 func TestBuildServer_NoTimezone(t *testing.T) {
-	app := appkit.App{}
+	app := appkit.App{Log: func(...any) {}}
 	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{})
 	if !errors.Is(err, appkit.ErrNoTimezone) {
 		t.Fatalf("expected ErrNoTimezone, got %v", err)
+	}
+}
+
+func TestApp_NoLogIsAnError(t *testing.T) {
+	app := appkit.App{Timezone: "America/Santiago", Server: appkit.AppServer{Database: openMem}}
+	if _, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{}); !errors.Is(err, appkit.ErrNoLog) {
+		t.Fatalf("BuildServer without App.Log: want ErrNoLog, got %v", err)
+	}
+	if _, err := appkit.BuildModules(app, orm.New(mem.New())); !errors.Is(err, appkit.ErrNoLog) {
+		t.Fatalf("BuildModules without App.Log: want ErrNoLog, got %v", err)
 	}
 }

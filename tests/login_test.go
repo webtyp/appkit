@@ -14,17 +14,19 @@ import (
 
 type dummyEntry struct{}
 
-func (dummyEntry) ModelName() string                  { return "dummy_entry" }
-func (dummyEntry) Authn() router.Middleware            { return nil }
-func (dummyEntry) Authorize() model.Authorizer         { return func(string, model.Resource, model.Action) bool { return true } }
-func (dummyEntry) Policy() model.PolicyDescriber       { return nil }
+func (dummyEntry) ModelName() string        { return "dummy_entry" }
+func (dummyEntry) Authn() router.Middleware { return nil }
+func (dummyEntry) Authorize() model.Authorizer {
+	return func(string, model.Resource, model.Action) bool { return true }
+}
+func (dummyEntry) Policy() model.PolicyDescriber { return nil }
 
 func TestBuildServer_WithEntryModule(t *testing.T) {
 	entryProvider := mod("entry", func(d appkit.Deps) (model.ModuleNaming, error) {
 		return dummyEntry{}, nil
 	})
 
-	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago", TenantID: "test",
 		Server:  appkit.AppServer{Database: openMem},
 		Modules: []appkit.Module{entryProvider},
 	}
@@ -38,7 +40,7 @@ func TestBuildServer_WithEntryModule(t *testing.T) {
 func TestBuildServer_WithoutEntryModule(t *testing.T) {
 	var logged []string
 	app := appkit.App{Timezone: "America/Santiago", TenantID: "test",
-		Server:  appkit.AppServer{Database: openMem},
+		Server: appkit.AppServer{Database: openMem},
 		Log: func(args ...any) {
 			for _, a := range args {
 				logged = append(logged, a.(string))

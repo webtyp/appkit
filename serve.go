@@ -88,7 +88,10 @@ func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router
 //
 //	srv, err := appkit.BuildServer(config.App, appkit.ServerEnv{Port: "8080"}, config.Schema)
 func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r router.Router, policy model.PolicyDescriber) error) (*httpd.Server, error) {
-	logger := loggerOf(app)
+	if app.Log == nil {
+		return nil, ErrNoLog
+	}
+	logger := app.Log
 	ids, err := unixid.NewUnixID()
 	if err != nil {
 		return nil, err

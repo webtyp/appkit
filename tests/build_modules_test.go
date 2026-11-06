@@ -1,4 +1,3 @@
-
 //go:build !wasm
 
 package tests
@@ -15,6 +14,7 @@ import (
 )
 
 type dummyMod struct{}
+
 func (dummyMod) ModelName() string { return "dummy" }
 
 type partItem struct{ name string }
@@ -29,7 +29,7 @@ func (partsMod) Parts() []model.ModuleNaming {
 }
 
 func TestBuildModules_NilDB(t *testing.T) {
-	_, err := appkit.BuildModules(appkit.App{Timezone: "America/Santiago", TenantID: "t"}, nil)
+	_, err := appkit.BuildModules(appkit.App{Log: func(...any) {}, Timezone: "America/Santiago", TenantID: "t"}, nil)
 	if !errors.Is(err, appkit.ErrNoDatabase) {
 		t.Fatalf("expected ErrNoDatabase, got %v", err)
 	}
@@ -40,7 +40,7 @@ func TestBuildModules_FindsAppModules(t *testing.T) {
 		return dummyMod{}, nil
 	})
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		TenantID: "t",
 		Modules:  []appkit.Module{trustedProvider},
 	}
@@ -61,7 +61,7 @@ func TestBuildModules_PartsAddsAllParts(t *testing.T) {
 		return partsMod{}, nil
 	})
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		TenantID: "t",
 		Modules:  []appkit.Module{partsProvider},
 	}
@@ -85,7 +85,7 @@ func TestBuildModules_ModuleErrorNamed(t *testing.T) {
 		return nil, errors.New("boom")
 	})
 
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		TenantID: "t",
 		Modules:  []appkit.Module{badProvider},
 	}
@@ -101,7 +101,7 @@ func TestBuildModules_ModuleErrorNamed(t *testing.T) {
 }
 
 func TestBuildModules_BadTimezone(t *testing.T) {
-	app := appkit.App{Timezone: "Mars/Base"}
+	app := appkit.App{Log: func(...any) {}, Timezone: "Mars/Base"}
 	db := orm.New(mem.New())
 	_, err := appkit.BuildModules(app, db)
 	if !errors.Is(err, appkit.ErrNoTimezone) {
@@ -120,7 +120,7 @@ func TestBuildModules_ZoneInDeps(t *testing.T) {
 			},
 		},
 	}
-	app := appkit.App{Timezone: "America/Santiago", Modules: []appkit.Module{m}}
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago", Modules: []appkit.Module{m}}
 	db := orm.New(mem.New())
 	_, err := appkit.BuildModules(app, db)
 	if err != nil {

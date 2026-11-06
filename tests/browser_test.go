@@ -11,7 +11,7 @@ import (
 )
 
 func TestApp_BrowserShape(t *testing.T) {
-	app := appkit.App{Timezone: "America/Santiago",
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago",
 		Modules: []appkit.Module{{Name: "x", Browser: appkit.ModuleBrowser{}}},
 	}
 	if app.Modules[0].Name != "x" {
@@ -30,7 +30,7 @@ func TestScreens_GetZone(t *testing.T) {
 			},
 		},
 	}
-	app := appkit.App{Timezone: "America/Santiago", Modules: []appkit.Module{m}}
+	app := appkit.App{Log: func(...any) {}, Timezone: "America/Santiago", Modules: []appkit.Module{m}}
 	caller := view.NewRecords().Caller(rpc.NewCaller(""))
 	_, err := appkit.Screens(app, caller)
 	if err != nil {

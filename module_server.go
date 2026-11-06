@@ -16,6 +16,7 @@ var (
 	ErrNoProvider    = errors.New("appkit: no module provides it — list the module that does before the one that needs it in App.Modules")
 	ErrManyProviders = errors.New("appkit: more than one module provides it — keep one in App.Modules")
 	ErrNoTimezone    = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
+	ErrNoLog         = errors.New("appkit: App.Log is nil — set it (log.Println) so the server's warnings are seen")
 )
 
 type ModuleServer struct {

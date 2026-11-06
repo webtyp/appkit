@@ -68,6 +68,8 @@ var server = appkit.AppServer{Database: postgres.Open}
 var server appkit.AppServer
 ```
 
+`Log` is **required** too (`log.Println`): the server writes its warnings there — a leftover column, no entry module — and refuses to start without it (`ErrNoLog`), never in silence.
+
 `Timezone` is **required**: an IANA name such as `America/Santiago`. appkit loads it once and every module receives
 it already loaded — `Deps.Zone` on the server, `BrowserDeps.Zone` in the browser — so every date and hour is shown on
 the installation's clock. Empty or unknown → the app does not start (`ErrNoTimezone`), never UTC in silence.

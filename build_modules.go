@@ -22,6 +22,9 @@ func BuildModules(app App, db *orm.DB) (Deps, error) {
 	if db == nil {
 		return Deps{}, ErrNoDatabase
 	}
+	if app.Log == nil {
+		return Deps{}, ErrNoLog
+	}
 	ids, err := unixid.NewUnixID()
 	if err != nil {
 		return Deps{}, err
@@ -30,7 +33,7 @@ func BuildModules(app App, db *orm.DB) (Deps, error) {
 	if err != nil {
 		return Deps{}, ErrNoTimezone
 	}
-	d := Deps{DB: db, IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone, Log: loggerOf(app)}
+	d := Deps{DB: db, IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone, Log: app.Log}
 	if _, _, err := buildModules(app, &d); err != nil {
 		return Deps{}, err
 	}

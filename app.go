@@ -9,7 +9,7 @@ type App struct {
 	Brand    Brand        // name and logo on the access screen and the chassis
 	Modules  []Module     // build, migration and menu order; the entry module goes first: appkit.Find finds it among the built modules
 	Server   AppServer    // what only the server binary needs; the app fills it from a !browser file, zero in the browser
-	Log      func(...any) // nil = discard
+	Log      func(...any) // required: where the server writes its warnings (log.Println); nil → ErrNoLog, never silence
 }
 
 // Module is one domain module as an app lists it in App.Modules, with its server part and its screens.
