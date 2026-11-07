@@ -5,6 +5,7 @@ go 1.26.8
 require (
 	webtyp.com/auth v0.0.109
 	webtyp.com/components v0.8.63
+	webtyp.com/crud v0.0.3
 	webtyp.com/ddl v0.0.46
 	webtyp.com/dom v0.13.29
 	webtyp.com/env v0.1.3
@@ -14,17 +15,17 @@ require (
 	webtyp.com/html v0.0.30
 	webtyp.com/lang v0.1.14
 	webtyp.com/layout v0.3.108
-	webtyp.com/mcp v0.3.20
-	webtyp.com/model v0.2.13
+	webtyp.com/mcp v0.3.23
+	webtyp.com/model v0.2.14
 	webtyp.com/orm v0.12.26
-	webtyp.com/router v0.4.17
-	webtyp.com/rpc v0.2.15
+	webtyp.com/router v0.4.19
+	webtyp.com/rpc v0.2.17
 	webtyp.com/server v0.2.115
 	webtyp.com/sqlite v0.3.30
 	webtyp.com/storage v0.1.18
 	webtyp.com/time v0.6.4
 	webtyp.com/unixid v0.3.1
-	webtyp.com/view v0.6.65
+	webtyp.com/view v0.6.66
 )
 
 require (
@@ -55,7 +56,6 @@ require (
 	webtyp.com/calendar v0.1.0 // indirect
 	webtyp.com/color v0.1.2 // indirect
 	webtyp.com/context v0.0.23 // indirect
-	webtyp.com/crud v0.0.3 // indirect
 	webtyp.com/css v0.4.31 // indirect
 	webtyp.com/dbus v0.1.1 // indirect
 	webtyp.com/erd v0.0.14 // indirect
@@ -75,17 +75,5 @@ require (
 	webtyp.com/webauthn v0.1.16 // indirect
 	webtyp.com/widget v0.6.46 // indirect
 )
-
-replace webtyp.com/model => ../model
-
-replace webtyp.com/router => ../router
-
-replace webtyp.com/crud => ../crud
-
-replace webtyp.com/rpc => ../rpc
-
-replace webtyp.com/mcp => ../mcp
-
-replace webtyp.com/view => ../view
 
 replace webtyp.com/layout => ../layout
