@@ -62,7 +62,11 @@ var App = appkit.App{
 }
 
 // config/server.go (//go:build !browser)
-var server = appkit.AppServer{Database: postgres.Open}
+var server = appkit.AppServer{
+	Database:    postgres.Open,
+	Infra:       []appkit.Infra{access.Infra},
+	PublicReads: []model.ModuleNaming{&catalog.Category{}},
+}
 
 // config/browser.go (//go:build browser)
 var server appkit.AppServer

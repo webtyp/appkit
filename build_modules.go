@@ -34,7 +34,7 @@ func BuildModules(app App, db *orm.DB) (Deps, error) {
 		return Deps{}, ErrNoTimezone
 	}
 	d := Deps{DB: db, IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone, Log: app.Log}
-	if _, _, err := buildModules(app, &d); err != nil {
+	if _, err := buildModules(app, &d); err != nil {
 		return Deps{}, err
 	}
 	return d, nil

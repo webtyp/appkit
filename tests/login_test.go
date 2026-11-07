@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/crud"
 	"webtyp.com/ddl"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -15,6 +16,7 @@ import (
 type dummyEntry struct{}
 
 func (dummyEntry) ModelName() string        { return "dummy_entry" }
+func (dummyEntry) MountOperations(crud.Registry) {}
 func (dummyEntry) Authn() router.Middleware { return nil }
 func (dummyEntry) Authorize() model.Authorizer {
 	return func(string, model.Resource, model.Action) bool { return true }

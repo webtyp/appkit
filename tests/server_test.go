@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/crud"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -16,13 +17,39 @@ import (
 	"webtyp.com/rpc"
 )
 
+type fakeModel struct{}
+
+func (fakeModel) ModelName() string { return "fake" }
+func (fakeModel) Schema() []model.Field {
+	return []model.Field{
+		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
+	}
+}
+func (fakeModel) Pointers() []any { return []any{} }
+func (fakeModel) IsNil() bool { return false }
+func (fakeModel) EncodeFields(w model.FieldWriter) {}
+func (fakeModel) DecodeFields(r model.FieldReader) {}
+
+type fakeModelList []*fakeModel
+
+func (l *fakeModelList) Append() model.Fielder {
+	m := &fakeModel{}
+	*l = append(*l, m)
+	return m
+}
+func (l *fakeModelList) At(i int) model.Fielder { return (*l)[i] }
+func (l *fakeModelList) Len() int { return len(*l) }
+func (l *fakeModelList) IsNil() bool { return l == nil }
+func (l *fakeModelList) EncodeFields(w model.FieldWriter) {}
+func (l *fakeModelList) DecodeFields(r model.FieldReader) {}
+
 type fakeOps struct{}
 
 func (fakeOps) ModelName() string { return "fake" }
-func (fakeOps) MountOperations(reg router.OperationRegistry) {
-	reg.Operation("list", func(ctx router.Context) {
-		ctx.Write([]byte("{}"))
-	}).Requires("fake", model.Read)
+func (fakeOps) MountOperations(reg crud.Registry) {
+	reg.Read(&fakeModel{}, nil, func(c crud.Caller, args crud.ReadArgs, filter model.Model) (model.ModelSlice, error) {
+		return &fakeModelList{}, nil
+	})
 }
 
 func fakeAuthn(userID string) router.Middleware {
@@ -102,25 +129,25 @@ func TestMCPClosedByDefault(t *testing.T) {
 
 func TestMCPOpensExposedTools(t *testing.T) {
 	r := buildRouter(t, appkit.ServerConfig{
-		Operations: []router.OperationModule{fakeOps{}},
-		MCPTools:   []mcp.ToolName{mcp.ToolNameOf("fake", "list")},
+		Operations: []crud.Module{fakeOps{}},
+		MCPTools:   []mcp.ToolName{mcp.ToolNameOf("fake", "fake_r")},
 		Authorize:  allowFakeRead,
 	}, fakeAuthn("test-user"))
 	status, body := post(r, mcp.MCPPath, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
 	if status != 200 {
 		t.Fatalf("tools/list: status %d, body %s", status, body)
 	}
-	if !strings.Contains(body, `"fake.list"`) {
-		t.Fatalf("tools/list must contain fake.list, got %s", body)
+	if !strings.Contains(body, `"fake.fake_r"`) {
+		t.Fatalf("tools/list must contain fake.fake_r, got %s", body)
 	}
 }
 
 func TestRPCMounted(t *testing.T) {
 	r := buildRouter(t, appkit.ServerConfig{
-		Operations: []router.OperationModule{fakeOps{}},
+		Operations: []crud.Module{fakeOps{}},
 		Authorize:  allowFakeRead,
 	}, fakeAuthn("test-user"))
-	path := rpc.DefaultPrefix + "/fake/list"
+	path := rpc.DefaultPrefix + "/fake/fake_r"
 	status, _ := post(r, path, `{}`)
 	if status != 200 {
 		t.Fatalf("with session and authorize allowing fake:r, want 200, got %d", status)
@@ -129,10 +156,10 @@ func TestRPCMounted(t *testing.T) {
 
 func TestAnonymousDenied(t *testing.T) {
 	r := buildRouter(t, appkit.ServerConfig{
-		Operations: []router.OperationModule{fakeOps{}},
+		Operations: []crud.Module{fakeOps{}},
 		Authorize:  allowFakeRead,
 	}, nil)
-	path := rpc.DefaultPrefix + "/fake/list"
+	path := rpc.DefaultPrefix + "/fake/fake_r"
 	status, body := post(r, path, `{}`)
 	if status != 403 {
 		t.Fatalf("without session, want 403, got %d (body: %s)", status, body)
@@ -146,10 +173,10 @@ func TestDefaultDenyWithoutAuthorize(t *testing.T) {
 	}
 
 	r := buildRouter(t, appkit.ServerConfig{
-		Operations: []router.OperationModule{fakeOps{}},
+		Operations: []crud.Module{fakeOps{}},
 		Logger:     logger,
 	}, fakeAuthn("test-user"))
-	path := rpc.DefaultPrefix + "/fake/list"
+	path := rpc.DefaultPrefix + "/fake/fake_r"
 	status, _ := post(r, path, `{}`)
 	if status != 403 {
 		t.Fatalf("without authorize, want 403, got %d", status)

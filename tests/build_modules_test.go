@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/crud"
 	"webtyp.com/model"
 	"webtyp.com/orm"
 	"webtyp.com/storage/mem"
@@ -16,6 +17,7 @@ import (
 type dummyMod struct{}
 
 func (dummyMod) ModelName() string { return "dummy" }
+func (dummyMod) MountOperations(crud.Registry) {}
 
 type partItem struct{ name string }
 
@@ -24,6 +26,7 @@ func (p partItem) ModelName() string { return p.name }
 type partsMod struct{}
 
 func (partsMod) ModelName() string { return "parts_mod" }
+func (partsMod) MountOperations(crud.Registry) {}
 func (partsMod) Parts() []model.ModuleNaming {
 	return []model.ModuleNaming{partItem{"p1"}, partItem{"p2"}}
 }

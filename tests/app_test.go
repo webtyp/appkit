@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/crud"
 	"webtyp.com/ddl"
 	"webtyp.com/model"
 	"webtyp.com/orm"
@@ -18,12 +19,14 @@ import (
 type providerMod struct{}                // provides categories
 func (providerMod) ModelName() string    { return "provider" }
 func (providerMod) Categories() []string { return []string{"a"} }
+func (providerMod) MountOperations(crud.Registry) {}
 
 type CategorySource interface{ Categories() []string }
 
 type consumerMod struct{ src CategorySource }
 
 func (consumerMod) ModelName() string { return "consumer" }
+func (consumerMod) MountOperations(crud.Registry) {}
 
 var calls []string // order of Build/Migrate calls, reset per test
 func mod(name string, build func(appkit.Deps) (model.ModuleNaming, error)) appkit.Module {
@@ -40,6 +43,7 @@ type provider2Mod struct{}
 
 func (provider2Mod) ModelName() string    { return "provider2" }
 func (provider2Mod) Categories() []string { return []string{"b"} }
+func (provider2Mod) MountOperations(crud.Registry) {}
 
 func TestFind_OneProvider(t *testing.T) {
 	calls = nil

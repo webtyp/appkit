@@ -55,6 +55,7 @@ require (
 	webtyp.com/calendar v0.1.0 // indirect
 	webtyp.com/color v0.1.2 // indirect
 	webtyp.com/context v0.0.23 // indirect
+	webtyp.com/crud v0.0.3 // indirect
 	webtyp.com/css v0.4.31 // indirect
 	webtyp.com/dbus v0.1.1 // indirect
 	webtyp.com/erd v0.0.14 // indirect
@@ -74,3 +75,17 @@ require (
 	webtyp.com/webauthn v0.1.16 // indirect
 	webtyp.com/widget v0.6.46 // indirect
 )
+
+replace webtyp.com/model => ../model
+
+replace webtyp.com/router => ../router
+
+replace webtyp.com/crud => ../crud
+
+replace webtyp.com/rpc => ../rpc
+
+replace webtyp.com/mcp => ../mcp
+
+replace webtyp.com/view => ../view
+
+replace webtyp.com/layout => ../layout

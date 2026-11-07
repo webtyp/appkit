@@ -3,6 +3,7 @@
 package appkit
 
 import (
+	"webtyp.com/crud"
 	"webtyp.com/ddl"
 	"webtyp.com/env"
 	eventsmock "webtyp.com/events/mock"
@@ -47,19 +48,16 @@ type ServerEnv struct {
 }
 
 // buildModules builds app.Modules in order on d.DB, appending each to d.built (so later modules Find it).
-// It returns the operation and API modules among them, for BuildServer to mount.
-func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router.APIModule, err error) {
+// It returns the crud modules among them, for BuildServer to mount.
+func buildModules(app App, d *Deps) (ops []crud.Module, err error) {
 	if d.built == nil {
 		builtSlice := make([]model.ModuleNaming, 0, len(app.Modules))
 		d.built = &builtSlice
 	}
 	appendBuilt := func(v model.ModuleNaming) {
 		*d.built = append(*d.built, v)
-		if o, ok := v.(router.OperationModule); ok {
+		if o, ok := v.(crud.Module); ok {
 			ops = append(ops, o)
-		}
-		if a, ok := v.(router.APIModule); ok {
-			apis = append(apis, a)
 		}
 	}
 	for _, m := range app.Modules {
@@ -68,7 +66,12 @@ func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router
 		}
 		built, err := m.Server.Build(*d)
 		if err != nil {
-			return nil, nil, fmt.ErrType(fmt.Err(m.Name), err)
+			return nil, fmt.ErrType(fmt.Err(m.Name), err)
+		}
+		_, isCrud := built.(crud.Module)
+		_, isParts := built.(Parts)
+		if !isCrud && !isParts {
+			return nil, fmt.ErrType(fmt.Err(m.Name), ErrNotCrudModule)
 		}
 		appendBuilt(built)
 		if p, ok := built.(Parts); ok {
@@ -77,7 +80,24 @@ func buildModules(app App, d *Deps) (ops []router.OperationModule, apis []router
 			}
 		}
 	}
-	return ops, apis, nil
+	return ops, nil
+}
+
+func buildInfra(app App, d Deps) ([]router.APIModule, error) {
+	var apis []router.APIModule
+	for _, i := range app.Server.Infra {
+		if i.Build == nil {
+			continue
+		}
+		built, err := i.Build(d)
+		if err != nil {
+			return nil, fmt.ErrType(fmt.Err(i.Name), err)
+		}
+		if built != nil {
+			apis = append(apis, built)
+		}
+	}
+	return apis, nil
 }
 
 // BuildServer builds the whole server without listening: database, modules in
@@ -116,10 +136,13 @@ func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r rout
 		warnLeftovers(conn, schema, logger)
 	}
 
-	var ops []router.OperationModule
+	var ops []crud.Module
 	var apis []router.APIModule
 	if d.DB != nil {
-		if ops, apis, err = buildModules(app, &d); err != nil {
+		if ops, err = buildModules(app, &d); err != nil {
+			return nil, err
+		}
+		if apis, err = buildInfra(app, d); err != nil {
 			return nil, err
 		}
 	}
@@ -152,15 +175,16 @@ func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r rout
 		Logger: logger, Authn: authn, Authorize: authorize, Policy: policy,
 	})
 	if err := MountServer(srv.Router(), ServerConfig{
-		Name:       app.TenantID,
-		Authorize:  authorize,
-		Policy:     policy,
-		Operations: ops,
-		MCPTools:   app.Server.MCPTools,
-		APIModules: apis,
-		Mounts:     mounts,
-		Register:   app.Server.Routes,
-		Logger:     logger,
+		Name:        app.TenantID,
+		Authorize:   authorize,
+		Policy:      policy,
+		Operations:  ops,
+		PublicReads: app.Server.PublicReads,
+		MCPTools:    app.Server.MCPTools,
+		APIModules:  apis,
+		Mounts:      mounts,
+		Register:    app.Server.Routes,
+		Logger:      logger,
 	}); err != nil {
 		return nil, err
 	}

@@ -3,6 +3,10 @@
 package appkit
 
 import (
+	"strings"
+
+	"webtyp.com/crud"
+	"webtyp.com/fmt"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -11,15 +15,16 @@ import (
 
 // ServerConfig is everything an app tells appkit about its server contracts.
 type ServerConfig struct {
-	Name       string                                                     // the app's name; MCP server name
-	Authorize  model.Authorizer                                           // nil = deny everything (and log it)
-	Policy     model.PolicyDescriber                                      // optional: role permissions description for /_routes
-	Operations []router.OperationModule                                   // published at POST /api/<module>/<op>
-	MCPTools   []mcp.ToolName                                             // operations an agent may call; empty = MCP closed
-	APIModules []router.APIModule                                         // modules with their own routes (MountAPI)
-	Mounts     []func(r router.Router, policy model.PolicyDescriber) error // extra routes the app's main passes (dev tools); nil = none
-	Register   func(r router.Router)                                      // the app's own routes; nil = none
-	Logger     func(...any)
+	Name        string                                                      // the app's name; MCP server name
+	Authorize   model.Authorizer                                            // nil = deny everything (and log it)
+	Policy      model.PolicyDescriber                                       // optional: role permissions description for /_routes
+	Operations  []crud.Module                                               // published at POST /api/<module>/<op>
+	PublicReads []model.ModuleNaming                                        // entities whose read visitors may call without a session; nil = none
+	MCPTools    []mcp.ToolName                                              // operations an agent may call; empty = MCP closed
+	APIModules  []router.APIModule                                          // built from AppServer.Infra
+	Mounts      []func(r router.Router, policy model.PolicyDescriber) error // extra routes the app's main passes (dev tools); nil = none
+	Register    func(r router.Router)                                       // the app's own routes; nil = none
+	Logger      func(...any)
 }
 
 // MountServer mounts the application contracts onto r.
@@ -30,9 +35,13 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	}
 
 	if len(cfg.Operations) > 0 {
-		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Logger, cfg.Operations...); err != nil {
+		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Logger, cfg.PublicReads, cfg.Operations...); err != nil {
 			return err
 		}
+	}
+
+	if err := checkPublicReads(cfg.PublicReads, cfg.Operations); err != nil {
+		return err
 	}
 
 	provider, err := mcp.HarvestOps(cfg.MCPTools, cfg.Operations...)
@@ -64,6 +73,30 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 		cfg.Register(r)
 	}
 
+	return nil
+}
+
+func checkPublicReads(public []model.ModuleNaming, ops []crud.Module) error {
+	if len(public) == 0 {
+		return nil
+	}
+	routes, err := rpc.Routes(rpc.DefaultPrefix, public, ops...)
+	if err != nil {
+		return err
+	}
+	for _, p := range public {
+		suffix := "/" + crud.Op(p, model.Read)
+		found := false
+		for _, r := range routes {
+			if r.Access == model.AccessPublic && strings.HasSuffix(r.Path, suffix) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.ErrType(fmt.Err(p.ModelName()), ErrPublicReadNotMounted)
+		}
+	}
 	return nil
 }
 

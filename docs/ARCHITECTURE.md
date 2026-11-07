@@ -16,9 +16,11 @@ AWS AppConfig).
 ## Server half — `MountServer` (`//go:build !browser`)
 
 `MountServer(r router.Router, cfg ServerConfig) error` works on the `router.Router` **contract**, never on a
-concrete transport: it mounts rpc operations, the MCP server (only the tools named in `MCPTools`; empty =
-MCP closed), the `APIModules`, extra routes passed in `Mounts` (dev tools), and the app's own `Register(r)`.
+concrete transport: it mounts rpc operations (`crud.Module`), the MCP server (only the tools named in `MCPTools`; empty =
+MCP closed), the `APIModules` (built from `AppServer.Infra`), extra routes passed in `Mounts` (dev tools), and the app's own `Register(r)`.
 A nil `Authorize` becomes `DenyAll` (and logs every denial).
+
+Domain modules never receive `router.Router`: they are mounted strictly as `crud.Module`. Routes with the full router come only from `AppServer.Infra`, which the **app** writes in `config/`. Public read operations are declared explicitly by the app in `AppServer.PublicReads`. Build order is `Modules` → `Infra` → `MountServer`.
 
 It deliberately has no `httpd`, `env`, `dev.go` or `prod.go`: the concrete transport lives in `webtyp/server` (or
 the edge runtime), so the same mount runs in a local server and in a Worker, and tests use `router/mock`.
