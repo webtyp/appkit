@@ -45,7 +45,7 @@ func build(d appkit.Deps) (model.ModuleNaming, error) {
 
 // module/browser.go (//go:build browser)
 var server appkit.ModuleServer
-var browser = appkit.ModuleBrowser{Screens: ui.Screens}
+var browser = view.ModuleBrowser{Screens: ui.Screens}
 ```
 
 2. The app declares itself:
@@ -75,7 +75,7 @@ var server appkit.AppServer
 `Log` is **required** too (`log.Println`): the server writes its warnings there — a leftover column, no entry module — and refuses to start without it (`ErrNoLog`), never in silence.
 
 `Timezone` is **required**: an IANA name such as `America/Santiago`. appkit loads it once and every module receives
-it already loaded — `Deps.Zone` on the server, `BrowserDeps.Zone` in the browser — so every date and hour is shown on
+it already loaded — `Deps.Zone` on the server, `view.BrowserDeps.Zone` in the browser — so every date and hour is shown on
 the installation's clock. Empty or unknown → the app does not start (`ErrNoTimezone`), never UTC in silence.
 
 3. The generated mains:
@@ -85,7 +85,7 @@ the installation's clock. Empty or unknown → the app does not start (`ErrNoTim
 func main() { if err := appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...); err != nil { log.Fatal(err) } }
 
 // web/browser/main.go
-func main() { appkit.Browser(config.App, devtools.Menu()) }
+func main() { layoutapp.Browser(config.App, devtools.Menu()) }
 ```
 
 `config.Schema` (generated: every module's migration plus `config/removed.go`) lets the server log, at every start,
@@ -102,13 +102,14 @@ Import steps build the modules on their transaction with `BuildModules`:
 
 ## Documentation Map
 
+`appkit` never imports `webtyp.com/layout`.
+
 | File | What |
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design and decisions |
 | [`app.go`](app.go) | `App`, `Module` |
 | [`module_server.go`](module_server.go) | `ModuleServer`, `Deps`, `Find`, `Entry`, `Parts` |
-| [`module_browser.go`](module_browser.go) | `ModuleBrowser`, `BrowserDeps`, `EntryScreens` |
+| [`screens.go`](screens.go) | `Screens`, `EntryScreens` |
 | [`brand.go`](brand.go) / [`brand_ssr.go`](brand_ssr.go) | `Brand` and loading HTML |
 | [`env.go`](env.go) / [`serve.go`](serve.go) | Server environment, server build (`Server`, `BuildServer`) |
-| [`browser.go`](browser.go) | The browser session (`Browser`) |
 | [`server.go`](server.go) | `MountServer`: rpc, MCP, `Mounts` |

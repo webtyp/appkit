@@ -54,4 +54,6 @@ Entry is a module in `App.Modules` (`webtyp.com/access/module`). On the server, 
 finds it among built modules and obtains `Authn`, `Authorize` and `Policy`. If no entry module is present,
 operations are denied by default (`DenyAll`). If the entry module builds multiple domain parts (users, access),
 it implements `Parts` so that `appkit.Find`, operations and API routes discover them as if they were top-level modules.
-In the browser, the entry module sets `ModuleBrowser.Entry` returning `EntryScreens` (`Login`, `Setup`, `IdleSeconds`).
+In the browser, the entry module sets `view.ModuleBrowser.Entry` returning `view.EntryScreens` (`Login`, `Setup`, `IdleSeconds`).
+
+`appkit` never imports `webtyp.com/layout`. Chassis bootstrap moves to `webtyp.com/layout/app` (`layoutapp.Browser`).
