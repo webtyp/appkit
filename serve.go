@@ -10,6 +10,7 @@ import (
 	"webtyp.com/fmt"
 	"webtyp.com/model"
 	"webtyp.com/orm"
+	"webtyp.com/rbac"
 	"webtyp.com/router"
 	"webtyp.com/server/httpd"
 	"webtyp.com/storage"
@@ -147,6 +148,21 @@ func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r rout
 		}
 	}
 
+	var mergedGrants []model.Grant
+	for _, m := range app.Modules {
+		if len(m.Server.DefaultGrants) > 0 {
+			mergedGrants = append(mergedGrants, m.Server.DefaultGrants...)
+		}
+	}
+	if len(mergedGrants) > 0 {
+		if app.Server.Grants == nil {
+			return nil, ErrNoGrants
+		}
+		if err := app.Server.Grants.EnsureGrants(app.TenantID, rbac.RoleAuthenticated, mergedGrants); err != nil {
+			return nil, err
+		}
+	}
+
 	var (
 		authn     router.Middleware
 		authorize = DenyAll(logger)
@@ -179,7 +195,7 @@ func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r rout
 		Authorize:   authorize,
 		Policy:      policy,
 		Operations:  ops,
-		PublicReads: app.Server.PublicReads,
+		Public:      app.Server.Public,
 		MCPTools:    app.Server.MCPTools,
 		APIModules:  apis,
 		Mounts:      mounts,

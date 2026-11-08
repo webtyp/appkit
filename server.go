@@ -19,7 +19,7 @@ type ServerConfig struct {
 	Authorize   model.Authorizer                                            // nil = deny everything (and log it)
 	Policy      model.PolicyDescriber                                       // optional: role permissions description for /_routes
 	Operations  []crud.Module                                               // published at POST /api/<module>/<op>
-	PublicReads []model.ModuleNaming                                        // entities whose read visitors may call without a session; nil = none
+	Public      []crud.Public                                               // actions visitors may call without a session; nil = none
 	MCPTools    []mcp.ToolName                                              // operations an agent may call; empty = MCP closed
 	APIModules  []router.APIModule                                          // built from AppServer.Infra
 	Mounts      []func(r router.Router, policy model.PolicyDescriber) error // extra routes the app's main passes (dev tools); nil = none
@@ -35,12 +35,12 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	}
 
 	if len(cfg.Operations) > 0 {
-		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Logger, cfg.PublicReads, cfg.Operations...); err != nil {
+		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Logger, cfg.Public, cfg.Operations...); err != nil {
 			return err
 		}
 	}
 
-	if err := checkPublicReads(cfg.PublicReads, cfg.Operations); err != nil {
+	if err := checkPublic(cfg.Public, cfg.Operations); err != nil {
 		return err
 	}
 
@@ -76,7 +76,7 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	return nil
 }
 
-func checkPublicReads(public []model.ModuleNaming, ops []crud.Module) error {
+func checkPublic(public []crud.Public, ops []crud.Module) error {
 	if len(public) == 0 {
 		return nil
 	}
@@ -84,17 +84,23 @@ func checkPublicReads(public []model.ModuleNaming, ops []crud.Module) error {
 	if err != nil {
 		return err
 	}
+	actions := []model.Action{model.Create, model.Read, model.Update, model.Delete}
 	for _, p := range public {
-		suffix := "/" + crud.Op(p, model.Read)
-		found := false
-		for _, r := range routes {
-			if r.Access == model.AccessPublic && strings.HasSuffix(r.Path, suffix) {
-				found = true
-				break
+		for _, act := range actions {
+			if !p.Actions.Has(act) {
+				continue
 			}
-		}
-		if !found {
-			return fmt.ErrType(fmt.Err(p.ModelName()), ErrPublicReadNotMounted)
+			suffix := "/" + crud.Op(p.Model, act)
+			found := false
+			for _, r := range routes {
+				if r.Access == model.AccessPublic && strings.HasSuffix(r.Path, suffix) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.ErrType(fmt.Err(p.Model.ModelName()), ErrPublicNotMounted)
+			}
 		}
 	}
 	return nil

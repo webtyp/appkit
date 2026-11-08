@@ -3,7 +3,7 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
-	webtyp.com/crud v0.0.3
+	webtyp.com/crud v0.0.4
 	webtyp.com/ddl v0.0.46
 	webtyp.com/env v0.1.3
 	webtyp.com/events v0.1.7
@@ -13,7 +13,7 @@ require (
 	webtyp.com/model v0.2.15
 	webtyp.com/orm v0.12.26
 	webtyp.com/router v0.4.19
-	webtyp.com/rpc v0.2.17
+	webtyp.com/rpc v0.2.18
 	webtyp.com/server v0.2.119
 	webtyp.com/sqlite v0.3.30
 	webtyp.com/storage v0.1.18
@@ -58,6 +58,8 @@ require (
 	webtyp.com/keyring v0.2.9 // indirect
 	webtyp.com/msgtype v0.1.0 // indirect
 	webtyp.com/pwa v0.2.13 // indirect
+	webtyp.com/rbac v0.0.33 // indirect
 	webtyp.com/sqlt v0.0.14 // indirect
+	webtyp.com/user v0.3.14 // indirect
 	webtyp.com/webauthn v0.1.16 // indirect
 )

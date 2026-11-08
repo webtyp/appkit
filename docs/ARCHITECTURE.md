@@ -20,7 +20,11 @@ concrete transport: it mounts rpc operations (`crud.Module`), the MCP server (on
 MCP closed), the `APIModules` (built from `AppServer.Infra`), extra routes passed in `Mounts` (dev tools), and the app's own `Register(r)`.
 A nil `Authorize` becomes `DenyAll` (and logs every denial).
 
-Domain modules never receive `router.Router`: they are mounted strictly as `crud.Module`. Routes with the full router come only from `AppServer.Infra`, which the **app** writes in `config/`. Public read operations are declared explicitly by the app in `AppServer.PublicReads`. Build order is `Modules` → `Infra` → `MountServer`.
+Domain modules never receive `router.Router`: they are mounted strictly as `crud.Module`. Routes with the full router come only from `AppServer.Infra`, which the **app** writes in `config/`. Public operations (reads or writes) are declared explicitly by the app in `AppServer.Public`. Build order is `Modules` → `Infra` → `MountServer`.
+
+### DefaultGrants and the authenticated role
+
+What any signed-in person may do is declared by each module in `ModuleServer.DefaultGrants`. At boot, `BuildServer` merges all modules' `DefaultGrants` and applies them to `rbac.RoleAuthenticated` via `AppServer.Grants.EnsureGrants(app.TenantID, rbac.RoleAuthenticated, merged)`. If any module declares `DefaultGrants` but `AppServer.Grants` is nil, the server refuses to boot (`ErrNoGrants`).
 
 It deliberately has no `httpd`, `env`, `dev.go` or `prod.go`: the concrete transport lives in `webtyp/server` (or
 the edge runtime), so the same mount runs in a local server and in a Worker, and tests use `router/mock`.

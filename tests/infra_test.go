@@ -11,6 +11,7 @@ import (
 	"webtyp.com/crud"
 	"webtyp.com/ddl"
 	"webtyp.com/model"
+	"webtyp.com/rbac"
 	"webtyp.com/router"
 )
 
@@ -122,12 +123,50 @@ func TestBuildModules_NeitherCrudNorPartsIsError(t *testing.T) {
 	}
 }
 
-func TestPublicReads_Mounted(t *testing.T) {
+type fakeTableModel struct {
+	id string
+}
+
+func (m *fakeTableModel) ModelName() string   { return "fake" }
+func (m *fakeTableModel) Allow() model.Action { return model.Create | model.Read }
+func (m *fakeTableModel) Schema() []model.Field {
+	return []model.Field{
+		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
+	}
+}
+func (m *fakeTableModel) Pointers() []any                  { return []any{&m.id} }
+func (m *fakeTableModel) IsNil() bool                      { return m == nil }
+func (m *fakeTableModel) EncodeFields(w model.FieldWriter) {}
+func (m *fakeTableModel) DecodeFields(r model.FieldReader) {}
+
+type fakeTableStore struct{}
+
+func (fakeTableStore) NewID() string                                                               { return "1" }
+func (fakeTableStore) ReadOne(rec model.Model, id string) error                                    { return nil }
+func (fakeTableStore) ReadAll(newRow func() model.Model, q crud.Query, onRow func(model.Model)) error {
+	return nil
+}
+func (fakeTableStore) Create(rec model.Model) error                          { return nil }
+func (fakeTableStore) UpdateFields(rec model.Model, id string, fields []string) error { return nil }
+func (fakeTableStore) Delete(rec model.Model, id string) error               { return nil }
+
+type fakeTableOps struct{}
+
+func (fakeTableOps) ModelName() string { return "fake" }
+func (fakeTableOps) MountOperations(reg crud.Registry) {
+	reg.Table(crud.Table{
+		Model:   &fakeTableModel{},
+		NewList: func() model.ModelSlice { return &fakeModelList{} },
+		Store:   fakeTableStore{},
+	})
+}
+
+func TestPublic_CreateMounted(t *testing.T) {
 	m := appkit.Module{
 		Name: "fake_mod",
 		Server: appkit.ModuleServer{
 			Build: func(d appkit.Deps) (model.ModuleNaming, error) {
-				return fakeOps{}, nil
+				return fakeTableOps{}, nil
 			},
 		},
 	}
@@ -136,8 +175,10 @@ func TestPublicReads_Mounted(t *testing.T) {
 		Timezone: "America/Santiago",
 		TenantID: "test",
 		Server: appkit.AppServer{
-			Database:    openMem,
-			PublicReads: []model.ModuleNaming{fakeModel{}},
+			Database: openMem,
+			Public: []crud.Public{
+				{Model: &fakeTableModel{}, Actions: model.Create},
+			},
 		},
 		Modules: []appkit.Module{m},
 	}
@@ -145,7 +186,7 @@ func TestPublicReads_Mounted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildServer: %v", err)
 	}
-	expectedSuffix := "/" + crud.Op(fakeModel{}, model.Read)
+	expectedSuffix := "/" + crud.Op(&fakeTableModel{}, model.Create)
 	found := false
 	for _, r := range srv.Router().Routes() {
 		if strings.HasSuffix(r.Path, expectedSuffix) {
@@ -165,7 +206,7 @@ type otherModel struct{}
 
 func (otherModel) ModelName() string { return "other" }
 
-func TestPublicReads_UnknownIsError(t *testing.T) {
+func TestPublic_UnknownIsError(t *testing.T) {
 	m := appkit.Module{
 		Name: "fake_mod",
 		Server: appkit.ModuleServer{
@@ -179,8 +220,10 @@ func TestPublicReads_UnknownIsError(t *testing.T) {
 		Timezone: "America/Santiago",
 		TenantID: "test",
 		Server: appkit.AppServer{
-			Database:    openMem,
-			PublicReads: []model.ModuleNaming{otherModel{}},
+			Database: openMem,
+			Public: []crud.Public{
+				{Model: otherModel{}, Actions: model.Read},
+			},
 		},
 		Modules: []appkit.Module{m},
 	}
@@ -188,7 +231,96 @@ func TestPublicReads_UnknownIsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !errors.Is(err, appkit.ErrPublicReadNotMounted) {
-		t.Fatalf("expected ErrPublicReadNotMounted, got %v", err)
+	if !errors.Is(err, appkit.ErrPublicNotMounted) {
+		t.Fatalf("expected ErrPublicNotMounted, got %v", err)
+	}
+}
+
+type fakeGranter struct {
+	calls []grantCall
+}
+
+type grantCall struct {
+	projectID string
+	role      model.RoleCode
+	grants    []model.Grant
+}
+
+func (f *fakeGranter) EnsureGrants(projectID string, role model.RoleCode, grants []model.Grant) error {
+	f.calls = append(f.calls, grantCall{projectID: projectID, role: role, grants: grants})
+	return nil
+}
+
+func TestGrants_AppliedAtBoot(t *testing.T) {
+	granter := &fakeGranter{}
+	grants := []model.Grant{
+		{Resource: "fake", Actions: model.Read},
+	}
+	m := appkit.Module{
+		Name: "fake_mod",
+		Server: appkit.ModuleServer{
+			DefaultGrants: grants,
+			Build: func(d appkit.Deps) (model.ModuleNaming, error) {
+				return fakeOps{}, nil
+			},
+		},
+	}
+	app := appkit.App{
+		Log:      func(...any) {},
+		Timezone: "America/Santiago",
+		TenantID: "tenant-123",
+		Server: appkit.AppServer{
+			Database: openMem,
+			Grants:   granter,
+		},
+		Modules: []appkit.Module{m},
+	}
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"}, ddl.Schema{})
+	if err != nil {
+		t.Fatalf("BuildServer: %v", err)
+	}
+	if len(granter.calls) != 1 {
+		t.Fatalf("expected 1 call to EnsureGrants, got %d", len(granter.calls))
+	}
+	call := granter.calls[0]
+	if call.projectID != "tenant-123" {
+		t.Errorf("projectID: got %q, want tenant-123", call.projectID)
+	}
+	if call.role != rbac.RoleAuthenticated {
+		t.Errorf("role: got %q, want %q", call.role, rbac.RoleAuthenticated)
+	}
+	if len(call.grants) != 1 || call.grants[0] != grants[0] {
+		t.Errorf("grants: got %+v, want %+v", call.grants, grants)
+	}
+}
+
+func TestGrants_MissingGranterIsError(t *testing.T) {
+	m := appkit.Module{
+		Name: "fake_mod",
+		Server: appkit.ModuleServer{
+			DefaultGrants: []model.Grant{
+				{Resource: "fake", Actions: model.Read},
+			},
+			Build: func(d appkit.Deps) (model.ModuleNaming, error) {
+				return fakeOps{}, nil
+			},
+		},
+	}
+	app := appkit.App{
+		Log:      func(...any) {},
+		Timezone: "America/Santiago",
+		TenantID: "tenant-123",
+		Server: appkit.AppServer{
+			Database: openMem,
+			Grants:   nil,
+		},
+		Modules: []appkit.Module{m},
+	}
+	_, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "x"}, ddl.Schema{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, appkit.ErrNoGrants) {
+		t.Fatalf("expected ErrNoGrants, got %v", err)
 	}
 }

@@ -17,12 +17,14 @@ var (
 	ErrManyProviders = errors.New("appkit: more than one module provides it — keep one in App.Modules")
 	ErrNoTimezone    = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
 	ErrNoLog         = errors.New("appkit: App.Log is nil — set it (log.Println) so the server's warnings are seen")
-	ErrNotCrudModule       = errors.New("appkit: a module builds neither a crud.Module nor Parts — its operations would never be mounted")
-	ErrPublicReadNotMounted = errors.New("appkit: AppServer.PublicReads names an entity no module reads")
+	ErrNotCrudModule    = errors.New("appkit: a module builds neither a crud.Module nor Parts — its operations would never be mounted")
+	ErrPublicNotMounted = errors.New("appkit: AppServer.Public names an action no module offers")
+	ErrNoGrants         = errors.New("appkit: a module declares DefaultGrants but AppServer.Grants is nil; set it to the app's rbac service")
 )
 
 type ModuleServer struct {
-	Build func(d Deps) (model.ModuleNaming, error)
+	Build         func(d Deps) (model.ModuleNaming, error)
+	DefaultGrants []model.Grant // what any signed-in person may do with this module (granted to rbac.RoleAuthenticated)
 }
 
 // Entry is how people enter the app; one module of App.Modules provides it. Without it every operation is denied.

@@ -63,9 +63,13 @@ var App = appkit.App{
 
 // config/server.go (//go:build !browser)
 var server = appkit.AppServer{
-	Database:    postgres.Open,
-	Infra:       []appkit.Infra{access.Infra},
-	PublicReads: []model.ModuleNaming{&catalog.Category{}},
+	Database: postgres.Open,
+	Infra:    []appkit.Infra{access.Infra},
+	Public: []crud.Public{
+		{Model: &catalog.Category{}, Actions: model.Read},
+		{Model: &contact.Message{}, Actions: model.Create},
+	},
+	Grants: rbacService,
 }
 
 // config/browser.go (//go:build browser)
@@ -77,6 +81,12 @@ var server appkit.AppServer
 `Timezone` is **required**: an IANA name such as `America/Santiago`. appkit loads it once and every module receives
 it already loaded — `Deps.Zone` on the server, `view.BrowserDeps.Zone` in the browser — so every date and hour is shown on
 the installation's clock. Empty or unknown → the app does not start (`ErrNoTimezone`), never UTC in silence.
+
+### Public and DefaultGrants
+
+The app — never a module — opens actions to visitors without a session through `AppServer.Public` (e.g. public category read or public contact message create).
+
+What any signed-in person may do is declared by each module in `ModuleServer.DefaultGrants`. At boot, `BuildServer` merges all modules' `DefaultGrants` and applies them to `rbac.RoleAuthenticated` via `AppServer.Grants.EnsureGrants`. If any module declares `DefaultGrants` but `AppServer.Grants` is nil, the server refuses to start (`ErrNoGrants`).
 
 3. The generated mains:
 
