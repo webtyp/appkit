@@ -8,7 +8,7 @@ require (
 	webtyp.com/env v0.1.3
 	webtyp.com/events v0.1.7
 	webtyp.com/fmt v1.0.0
-	webtyp.com/lang v0.1.14
+	webtyp.com/lang v0.1.15
 	webtyp.com/mcp v0.3.23
 	webtyp.com/model v0.2.14
 	webtyp.com/orm v0.12.26
