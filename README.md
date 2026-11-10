@@ -19,9 +19,7 @@ and `web/browser/main.go` are generated (migrations live in `webtyp.com/migrate`
 
 ## Before You Start
 
-- **appkit's types carry no destination tag**: `App`, `Module`, `AppServer`, `ModuleServer`, `ModuleBrowser`
-  exist in every binary, so gopls never reports an undefined symbol. What keeps server code out of the wasm is the
-  **values**: a module (and the app) fills each part from a tagged file and leaves it zero in the other binary.
+- **Isomorphic separation**: [`app_server.go`](app_server.go), [`module_server.go`](module_server.go), and [`server.go`](server.go) are tagged `//go:build !browser` (`serve.go` is `!wasm`). In browser WASM, empty struct stand-ins ([`app_server_browser.go`](app_server_browser.go), [`module_server_browser.go`](module_server_browser.go)) keep types defined without compiling server dependencies.
 - Modules are built and shown in `App.Modules` order. The entry module (`webtyp.com/access/module`) goes first:
   appkit finds it among the built modules via `Find[Entry]`.
 - The first screen of the list is the one opened first.
@@ -48,14 +46,14 @@ var server appkit.ModuleServer
 var browser = view.ModuleBrowser{Screens: ui.Screens}
 ```
 
-2. The app declares itself:
+2. The app declares itself with [`view.Brand`](https://github.com/webtyp/view):
 
 ```go
 // config/app.go (no tag)
 var App = appkit.App{
 	TenantID: "acme",
 	Timezone: "America/Santiago",
-	Brand:    Brand, // config/brand.go: appkit.Brand{Name, LogoMark}
+	Brand:    view.Brand{Name: "Acme", LogoMark: "logo.svg"},
 	Modules:  []appkit.Module{access.Module, catalog.Module},
 	Server:   server,
 	Log:      fmt.Println,
@@ -76,17 +74,23 @@ var server = appkit.AppServer{
 var server appkit.AppServer
 ```
 
-`Log` is **required** too (`log.Println`): the server writes its warnings there — a leftover column, no entry module — and refuses to start without it (`ErrNoLog`), never in silence.
+`Log` is **required** (`log.Println`): the server writes its warnings there and refuses to start without it (`ErrNoLog`).
+`Timezone` is **required**: an IANA name (`America/Santiago`) loaded once for both `Deps.Zone` and `view.BrowserDeps.Zone` (`ErrNoTimezone`).
 
-`Timezone` is **required**: an IANA name such as `America/Santiago`. appkit loads it once and every module receives
-it already loaded — `Deps.Zone` on the server, `view.BrowserDeps.Zone` in the browser — so every date and hour is shown on
-the installation's clock. Empty or unknown → the app does not start (`ErrNoTimezone`), never UTC in silence.
+### Server Events and Transports
 
-### Public and DefaultGrants
+`BuildServer` initializes `Deps.Events`: the broker writes announce on (`crud` publishes after each commit). `MountServer` passes `ServerConfig.Events` to `rpc.Mount` and `mcp.HarvestOps` so every write arriving by HTTP or by an agent announces itself:
 
-The app — never a module — opens actions to visitors without a session through `AppServer.Public` (e.g. public category read or public contact message create).
+```go
+cfg := appkit.ServerConfig{
+	Name:       app.TenantID,
+	Operations: ops,
+	Events:     d.Events, // broker writes announce on
+	Public:     app.Server.Public,
+}
+```
 
-What any signed-in person may do is declared by each module in `ModuleServer.DefaultGrants`. At boot, `BuildServer` merges all modules' `DefaultGrants` and applies them to `rbac.RoleAuthenticated` via `AppServer.Grants.EnsureGrants`. If any module declares `DefaultGrants` but `AppServer.Grants` is nil, the server refuses to start (`ErrNoGrants`).
+What any signed-in person may do is declared in `ModuleServer.DefaultGrants`, merged at boot and ensured via `AppServer.Grants`.
 
 3. The generated mains:
 
@@ -95,20 +99,10 @@ What any signed-in person may do is declared by each module in `ModuleServer.Def
 func main() { if err := appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...); err != nil { log.Fatal(err) } }
 
 // web/browser/main.go
-func main() { layoutapp.Browser(config.App, devtools.Menu()) }
+func main() { appkit.Browser(config.App, layoutapp.New(devtools.Menu())) }
 ```
 
-`config.Schema` (generated: every module's migration plus `config/removed.go`) lets the server log, at every start,
-each column the models no longer have but that still holds data — it never drops one ([serve.go](serve.go)).
-
-Import steps build the modules on their transaction with `BuildModules`:
-
-```go
-	plan := dataimport.Plan[appkit.Deps]{
-		Build: func(tx *orm.DB) (appkit.Deps, error) { return appkit.BuildModules(config.App, tx) },
-	}
-	// in a step: users, err := appkit.Find[*authority.Module](s.Modules)
-```
+`appkit.Browser(config.App, layout)` compiles `view.Session` through `appkit.NewSession` and hands it to `view.Layout`.
 
 ## Documentation Map
 
@@ -117,9 +111,12 @@ Import steps build the modules on their transaction with `BuildModules`:
 | File | What |
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design and decisions |
+| [`docs/TESTS.md`](docs/TESTS.md) | Test suite inventory and coverage |
 | [`app.go`](app.go) | `App`, `Module` |
+| [`session.go`](session.go) | `NewSession` (`view.Session`) |
+| [`browser.go`](browser.go) | `Browser` (`view.Layout`) |
 | [`module_server.go`](module_server.go) | `ModuleServer`, `Deps`, `Find`, `Entry`, `Parts` |
 | [`screens.go`](screens.go) | `Screens`, `EntryScreens` |
-| [`brand.go`](brand.go) / [`brand_ssr.go`](brand_ssr.go) | `Brand` and loading HTML |
+| [`brand.go`](brand.go) / [`brand_ssr.go`](brand_ssr.go) | Access screen copy and SSR pre-rendering |
 | [`env.go`](env.go) / [`serve.go`](serve.go) | Server environment, server build (`Server`, `BuildServer`) |
 | [`server.go`](server.go) | `MountServer`: rpc, MCP, `Mounts` |

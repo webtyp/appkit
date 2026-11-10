@@ -1,63 +1,75 @@
 # webtyp/appkit Architecture
 
-## Why it exists
+## 1. Overview in One Minute
 
-Every app with a login glued the same pieces by hand — server, session, permissions, menu, first admin —
-and whatever crossed several pieces ("the menu shows only what you may use") belonged to none of them.
-appkit **joins** those pieces; it does not own them. Each part stays in its owner (`router`, `rpc`, `mcp`,
-`auth`, `rbac`, `layout`, `access`) and the app writes only its configuration.
+`appkit` is the application kit for WebTyp: one [`App`](../app.go) value unites domain modules, access rules, server contracts, and user interface sessions into a unified application across both compilation targets (`web/server` and `web/browser`).
 
-## The name
+Instead of each application wiring servers, authentication fallbacks, permission verifications, and browser sessions manually, `appkit` joins these components by typed interfaces. It owns neither the database driver nor the UI layout: it delegates persistence to `storage.Conn` and rendering to [`view.Layout`](https://github.com/webtyp/view).
 
-"The kit to assemble an app" — precedent: Apple's AppKit/UIKit. Rejected: `appsetup` (clashes with the
-first-admin "setup" flow, 42 uses) and `appconfig` (clashes with every app's `config/` folder and with
-AWS AppConfig).
+```mermaid
+flowchart TD
+    App["appkit.App<br/>(config.App)"] --> ServerBoot["appkit.Server / BuildServer<br/>(!browser)"]
+    App --> BrowserBoot["appkit.Browser<br/>(browser)"]
+    ServerBoot --> Broker["d.Events<br/>(events.Publisher)"]
+    Broker --> RPC["rpc.Mount<br/>(/api/...)"]
+    Broker --> MCP["mcp.HarvestOps<br/>(/mcp)"]
+    BrowserBoot --> Session["appkit.NewSession<br/>(view.Session)"]
+    Session --> Layout["view.Layout.Show<br/>(renderer)"]
+```
 
-## Server half — `MountServer` (`//go:build !browser`)
+## 2. Repository Pieces & On-Disk Layout
 
-`MountServer(r router.Router, cfg ServerConfig) error` works on the `router.Router` **contract**, never on a
-concrete transport: it mounts rpc operations (`crud.Module`), the MCP server (only the tools named in `MCPTools`; empty =
-MCP closed), the `APIModules` (built from `AppServer.Infra`), extra routes passed in `Mounts` (dev tools), and the app's own `Register(r)`.
-A nil `Authorize` becomes `DenyAll` (and logs every denial).
+`appkit` is isomorphic by default: common definitions reside in untagged files, while backend logic and frontend bootstrap isolate behind build tags.
 
-Domain modules never receive `router.Router`: they are mounted strictly as `crud.Module`. Routes with the full router come only from `AppServer.Infra`, which the **app** writes in `config/`. Public operations (reads or writes) are declared explicitly by the app in `AppServer.Public`. Build order is `Modules` → `Infra` → `MountServer`.
+| File | Destination | Responsibility |
+|---|---|---|
+| [`app.go`](../app.go) | All | Core application contracts: [`App`](../app.go), [`Module`](../app.go), and foundational error declarations. |
+| [`server.go`](../server.go) | `!browser` | [`MountServer`](../server.go): mounts RPC endpoints, MCP tools, and extra mounts on `router.Router`. |
+| [`serve.go`](../serve.go) | `!wasm` | [`Server`](../serve.go) and [`BuildServer`](../serve.go): HTTP server orchestration, leftovers validation, and boot sequence. |
+| [`build_modules.go`](../build_modules.go) | `!wasm` | [`BuildModules`](../build_modules.go): builds module dependencies in transactional order for migrations and history imports. |
+| [`app_server.go`](../app_server.go) | `!browser` | [`AppServer`](../app_server.go): server-only configuration (database opener, public endpoints, grants). |
+| [`app_server_browser.go`](../app_server_browser.go) | `browser` | Empty [`AppServer`](../app_server_browser.go) stand-in to prevent server dependencies from compiling into browser WASM. |
+| [`module_server.go`](../module_server.go) | `!browser` | [`ModuleServer`](../module_server.go), `Deps`, `Find`, `Entry`, and `Parts`. |
+| [`module_server_browser.go`](../module_server_browser.go) | `browser` | Empty [`ModuleServer`](../module_server_browser.go) stand-in for client-side WASM. |
+| [`screens.go`](../screens.go) | All | Extracts UI screens and entry screens from modules with zone injection. |
+| [`session.go`](../session.go) | All | [`NewSession`](../session.go): compiles `view.Session` with a shared record pool for UI consumption. |
+| [`browser.go`](../browser.go) | `browser` | [`Browser`](../browser.go): client bootstrap handing `view.Session` to chosen `view.Layout`. |
+| [`brand.go`](../brand.go) / [`brand_ssr.go`](../brand_ssr.go) | All / `!wasm` | Access screen copy and SSR HTML pre-rendering. |
 
-### DefaultGrants and the authenticated role
+## 3. Step-by-Step Flows
 
-What any signed-in person may do is declared by each module in `ModuleServer.DefaultGrants`. At boot, `BuildServer` merges all modules' `DefaultGrants` and applies them to `rbac.RoleAuthenticated` via `AppServer.Grants.EnsureGrants(app.TenantID, rbac.RoleAuthenticated, merged)`. If any module declares `DefaultGrants` but `AppServer.Grants` is nil, the server refuses to boot (`ErrNoGrants`).
+### Server Mount and Transports Wiring
 
-It deliberately has no `httpd`, `env`, `dev.go` or `prod.go`: the concrete transport lives in `webtyp/server` (or
-the edge runtime), so the same mount runs in a local server and in a Worker, and tests use `router/mock`.
+At server boot, `BuildServer` initializes the in-process event broker (`Deps.Events`) and hands it to `MountServer`:
 
-**appkit never chooses the database.** The app opens its connection on the engine it picked (postgres, sqlite,
-indexdb, `storage/mem`) and hands it to appkit through the `storage` port; appkit may build on the engine-agnostic
-contracts (`storage`, `orm`, `changelog`) but never imports a concrete engine.
+```mermaid
+flowchart TD
+    Start["BuildServer(app, env, schema)"] --> LoadZone["LoadZone(app.Timezone)"]
+    LoadZone --> InitBroker["Init Deps.Events<br/>(Broker)"]
+    InitBroker --> BuildMods["buildModules(app, &d)"]
+    BuildMods --> Mount["MountServer(r, ServerConfig)"]
+    Mount --> PassBrokerRPC["rpc.Mount(..., cfg.Events, ops...)"]
+    Mount --> PassBrokerMCP["mcp.HarvestOps(cfg.Events, tools, ops...)"]
+    PassBrokerRPC --> Ready["Server ready to serve API"]
+    PassBrokerMCP --> Ready
+```
 
-## App and Module — one value, two binaries
+1. **Broker Initialization:** `BuildServer` builds a local event broker for the application lifecycle.
+2. **Module Construction:** Domain modules register entities and storage operations against the provided database.
+3. **Transport Attachment:** `MountServer` passes `ServerConfig.Events` to both `rpc.Mount` and `mcp.HarvestOps`.
+4. **Write Notification:** Stored entity writes via HTTP REST or MCP announce their commits over this broker to subscribers.
 
-`App` and `Module` carry no build tag, so `config.App` is the same value in `web/server` and `web/browser`. What belongs
-to one binary is a part — `AppServer`, `ModuleServer`, `ModuleBrowser` — whose type exists in every binary (appkit
-carries no destination tag, so gopls never sees an undefined symbol). The module and the app fill each part from their
-own tagged files and leave it zero in the other binary, so the browser wasm never links a `Build` or a driver, and the
-server never links a screen. `Browser` is `wasm` only. Rejected: two values (`App` + `Browser`) — every module
-was listed twice and the browser main referenced a symbol gopls could not see.
+### Browser Session Initialization
 
-Build order is `App.Modules` order; `Find` sees only modules built before it. The zone is loaded once by appkit; modules never load it. No database means no module built (the
-server still serves static files). Database migrations live in `webtyp.com/migrate` and dev tools in `webtyp.com/devtools`.
+In the browser client, `Browser` initializes the caller and compiles the presentation session:
 
-One construction path: `buildModules` is shared by `BuildServer` and `BuildModules`; server-only files.
+1. **Caller & Records:** `NewSession` creates an `rpc.Caller` wrapped by `view.NewRecords()` so all screens share a single in-memory record cache.
+2. **Screen Aggregation:** `Screens` and `EntryScreens` traverse `App.Modules`, supplying `view.BrowserDeps` containing the caller and loaded `time.Zone`.
+3. **Layout Handoff:** `appkit.Browser` passes the compiled `view.Session` to the provided `view.Layout` and starts the event loop.
 
-Leftover columns: `BuildServer` receives the app's `ddl.Schema` and, once the database is open, logs one line per
-column its models no longer have but that still holds data (`ddl.Leftovers`, read-only). Production never drops a
-column — that is a person's decision in `webtyp dev` (`migrate -drop`) — and a database that cannot be checked is
-logged, never a reason not to start.
+## 4. Security Boundaries & Contracts
 
-## Entry
-
-Entry is a module in `App.Modules` (`webtyp.com/access/module`). On the server, `appkit.Find[appkit.Entry]`
-finds it among built modules and obtains `Authn`, `Authorize` and `Policy`. If no entry module is present,
-operations are denied by default (`DenyAll`). If the entry module builds multiple domain parts (users, access),
-it implements `Parts` so that `appkit.Find`, operations and API routes discover them as if they were top-level modules.
-In the browser, the entry module sets `view.ModuleBrowser.Entry` returning `view.EntryScreens` (`Login`, `Setup`, `IdleSeconds`).
-
-`appkit` never imports `webtyp.com/layout`. Chassis bootstrap moves to `webtyp.com/layout/app` (`layoutapp.Browser`).
+- **Isomorphic Isolation:** Files importing database engines, migrations, or RPC server handlers are restricted to `!browser` builds. The browser binary compiles only `session.go`, `browser.go`, and empty server struct stand-ins, ensuring server internals never ship to client WASM.
+- **Transports Broker Binding:** Writes committed through RPC or MCP must announce on the shared broker (`ServerConfig.Events`). If no broker is supplied (`nil`), writes proceed without event dispatch and without panic.
+- **Closed Access by Default:** A nil `Authorize` configuration defaults to `DenyAll`, recording every unauthorized access attempt in logs. Public endpoints require explicit declaration in `AppServer.Public`.
+- **Decoupled UI Layout:** `appkit` never imports concrete layout packages (`webtyp.com/layout`). Layouts consume `view.Session` via `view.Layout`, allowing apps to swap UI wrappers without altering appkit.
