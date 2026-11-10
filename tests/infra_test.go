@@ -13,6 +13,7 @@ import (
 	"webtyp.com/model"
 	"webtyp.com/rbac"
 	"webtyp.com/router"
+	"webtyp.com/rpc"
 )
 
 type modWithAPI struct {
@@ -153,11 +154,30 @@ func (fakeTableStore) Delete(rec model.Model, id string) error               { r
 type fakeTableOps struct{}
 
 func (fakeTableOps) ModelName() string { return "fake" }
+
+func (fakeTableOps) Definition() model.ModuleDefinition {
+	return model.ModuleDefinition{
+		Name: "fake",
+		Entities: []model.Definition{{
+			Name:  (&fakeTableModel{}).ModelName(),
+			Allow: (&fakeTableModel{}).Allow(),
+			Rules: model.Rules{
+				Create: model.HaveNoBusinessRule,
+				Read:   model.HaveNoBusinessRule,
+			},
+		}},
+	}
+}
+
 func (fakeTableOps) MountOperations(reg crud.Registry) {
-	reg.Table(crud.Table{
+	reg.AddStoredEntity(crud.StoredEntity{
 		Model:   &fakeTableModel{},
 		NewList: func() model.ModelSlice { return &fakeModelList{} },
 		Store:   fakeTableStore{},
+		Rules: model.Rules{
+			Create: model.HaveNoBusinessRule,
+			Read:   model.HaveNoBusinessRule,
+		},
 	})
 }
 
@@ -186,10 +206,11 @@ func TestPublic_CreateMounted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildServer: %v", err)
 	}
-	expectedSuffix := "/" + crud.Op(&fakeTableModel{}, model.Create)
+	expectedMethod := rpc.MethodOf(model.Create)
+	expectedSuffix := "/" + (&fakeTableModel{}).ModelName()
 	found := false
 	for _, r := range srv.Router().Routes() {
-		if strings.HasSuffix(r.Path, expectedSuffix) {
+		if r.Method == expectedMethod && strings.HasSuffix(r.Path, expectedSuffix) {
 			if r.Access != model.AccessPublic {
 				t.Fatalf("expected AccessPublic, got %v", r.Access)
 			}
@@ -198,7 +219,7 @@ func TestPublic_CreateMounted(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("route ending with %s not found", expectedSuffix)
+		t.Fatalf("route with method %s ending with %s not found", expectedMethod, expectedSuffix)
 	}
 }
 

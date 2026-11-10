@@ -15,7 +15,10 @@ import (
 
 type dummyEntry struct{}
 
-func (dummyEntry) ModelName() string        { return "dummy_entry" }
+func (dummyEntry) ModelName() string { return "dummy_entry" }
+func (dummyEntry) Definition() model.ModuleDefinition {
+	return model.ModuleDefinition{Name: "dummy_entry"}
+}
 func (dummyEntry) MountOperations(crud.Registry) {}
 func (dummyEntry) Authn() router.Middleware { return nil }
 func (dummyEntry) Authorize() model.Authorizer {

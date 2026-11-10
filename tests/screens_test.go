@@ -11,8 +11,8 @@ import (
 
 type dummyCaller struct{}
 
-func (dummyCaller) Call(string, model.Encodable, model.Decodable, func(error)) {}
-func (dummyCaller) Dispatch(string, model.Encodable)                             {}
+func (dummyCaller) Call(router.Operation, model.Encodable, model.Decodable, func(error)) {}
+func (dummyCaller) Dispatch(router.Operation, model.Encodable)                             {}
 
 func TestScreens_GetZone(t *testing.T) {
 	var gotZone string

@@ -18,6 +18,7 @@ import (
 
 type providerMod struct{}                // provides categories
 func (providerMod) ModelName() string    { return "provider" }
+func (providerMod) Definition() model.ModuleDefinition { return model.ModuleDefinition{Name: "provider"} }
 func (providerMod) Categories() []string { return []string{"a"} }
 func (providerMod) MountOperations(crud.Registry) {}
 
@@ -26,6 +27,7 @@ type CategorySource interface{ Categories() []string }
 type consumerMod struct{ src CategorySource }
 
 func (consumerMod) ModelName() string { return "consumer" }
+func (consumerMod) Definition() model.ModuleDefinition { return model.ModuleDefinition{Name: "consumer"} }
 func (consumerMod) MountOperations(crud.Registry) {}
 
 var calls []string // order of Build/Migrate calls, reset per test
@@ -42,6 +44,7 @@ func openMem(string) (storage.Conn, error) { return mem.New(), nil }
 type provider2Mod struct{}
 
 func (provider2Mod) ModelName() string    { return "provider2" }
+func (provider2Mod) Definition() model.ModuleDefinition { return model.ModuleDefinition{Name: "provider2"} }
 func (provider2Mod) Categories() []string { return []string{"b"} }
 func (provider2Mod) MountOperations(crud.Registry) {}
 
