@@ -92,6 +92,13 @@ cfg := appkit.ServerConfig{
 
 What any signed-in person may do is declared in `ModuleServer.DefaultGrants`, merged at boot and ensured via `AppServer.Grants`.
 
+### External Calls Orchestration and Migration
+
+When entities declare `ExternalCalls` (`model.ExternalCallDefinition`), `BuildServer` initializes the durable queue (`webtyp.com/externalcalls` with `webtyp.com/backoff`), adapts it to `crud.CallQueue`, populates `Deps.Queue`, and sets `crud.SetDefaultQueue`.
+When modules declare external calls, `BuildServer` starts the periodic executor (`RunPendingCalls` with 50 calls limit) and handles crash recovery for expired `WaitForReply` calls.
+
+**Database migration:** External calls require the `queued_call` table. Add `externalcallsmigrate.Migrate(conn, compiler)` from `webtyp.com/externalcalls/migrate` to the database migration steps (`cmd/migrate/main.go`).
+
 3. The generated mains:
 
 ```go
@@ -117,6 +124,7 @@ func main() { appkit.Browser(config.App, layoutapp.New(devtools.Menu())) }
 | [`browser.go`](browser.go) | `Browser` (`view.Layout`) |
 | [`module_server.go`](module_server.go) | `ModuleServer`, `Deps`, `Find`, `Entry`, `Parts` |
 | [`screens.go`](screens.go) | `Screens`, `EntryScreens` |
+| [`external_calls.go`](external_calls.go) | `NewCallQueue`, `NewCallRunner`, `StartCallExecutor` |
 | [`brand.go`](brand.go) / [`brand_ssr.go`](brand_ssr.go) | Access screen copy and SSR pre-rendering |
 | [`env.go`](env.go) / [`serve.go`](serve.go) | Server environment, server build (`Server`, `BuildServer`) |
 | [`server.go`](server.go) | `MountServer`: rpc, MCP, `Mounts` |

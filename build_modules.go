@@ -4,6 +4,8 @@ package appkit
 
 import (
 	eventsmock "webtyp.com/events/mock" // same import path serve.go uses for eventsmock.Broker
+	"webtyp.com/backoff"
+	"webtyp.com/externalcalls"
 	"webtyp.com/orm"
 	"webtyp.com/time"
 	"webtyp.com/unixid"
@@ -33,7 +35,15 @@ func BuildModules(app App, db *orm.DB) (Deps, error) {
 	if err != nil {
 		return Deps{}, ErrNoTimezone
 	}
-	d := Deps{DB: db, IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone, Log: app.Log}
+	policy, err := backoff.New(time.Second, 60*time.Second)
+	if err != nil {
+		return Deps{}, err
+	}
+	q, err := externalcalls.New(db, ids, time.NowNano, policy)
+	if err != nil {
+		return Deps{}, err
+	}
+	d := Deps{DB: db, IDs: ids, Events: &eventsmock.Broker{}, TenantID: app.TenantID, Zone: zone, Log: app.Log, Queue: NewCallQueue(q)}
 	if _, err := buildModules(app, &d); err != nil {
 		return Deps{}, err
 	}

@@ -56,3 +56,7 @@
 | [TestNewSession_NoTimezoneIsAnError](../tests/session_test.go) | NewSession returns ErrNoTimezone when Timezone is omitted |
 | [TestNewSession_ScreensShareOnePageOfRecords](../tests/session_test.go) | Screens receive common records caller instance |
 | [TestNewSession_TwoEntryModulesIsAnError](../tests/session_test.go) | NewSession rejects multiple modules with Entry |
+| [TestCallQueueAdapter_AllMethods](../tests/external_calls_test.go) | CallQueueAdapter delegates queue operations to externalcalls.Queue |
+| [TestCallRunner_DeclarationAndRun](../tests/external_calls_test.go) | CallRunner resolves call declarations and executes external calls |
+| [TestBuildServer_WiresQueueAndRunner](../tests/external_calls_test.go) | BuildServer initializes call queue and runner for modules with external calls |
+| [TestCallExecutor_RecoversExpiredReplies](../tests/external_calls_test.go) | Call executor recovers expired WaitForReply calls to failed state |

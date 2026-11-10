@@ -3,10 +3,12 @@
 package appkit
 
 import (
+	"webtyp.com/backoff"
 	"webtyp.com/crud"
 	"webtyp.com/ddl"
 	"webtyp.com/env"
 	eventsmock "webtyp.com/events/mock"
+	"webtyp.com/externalcalls"
 	"webtyp.com/fmt"
 	"webtyp.com/model"
 	"webtyp.com/orm"
@@ -140,11 +142,27 @@ func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r rout
 	var ops []crud.Module
 	var apis []router.APIModule
 	if d.DB != nil {
+		policy, err := backoff.New(time.Second, 60*time.Second)
+		if err != nil {
+			return nil, err
+		}
+		q, err := externalcalls.New(d.DB, d.IDs, time.NowNano, policy)
+		if err != nil {
+			return nil, err
+		}
+		queueAdapter := NewCallQueue(q)
+		d.Queue = queueAdapter
+		crud.SetDefaultQueue(queueAdapter)
+
 		if ops, err = buildModules(app, &d); err != nil {
 			return nil, err
 		}
 		if apis, err = buildInfra(app, d); err != nil {
 			return nil, err
+		}
+		if hasExternalCalls(ops) {
+			runner := NewCallRunner(ops)
+			StartCallExecutor(q, runner, d.DB, 5*time.Second, logger)
 		}
 	}
 

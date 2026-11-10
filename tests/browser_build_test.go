@@ -21,6 +21,8 @@ func TestBrowserBuild_LeavesServerCodeOut(t *testing.T) {
 		"webtyp.com/mcp",
 		"webtyp.com/rbac",
 		"webtyp.com/server/httpd",
+		"webtyp.com/externalcalls",
+		"webtyp.com/backoff",
 	}
 	output := string(out)
 	for _, f := range forbidden {

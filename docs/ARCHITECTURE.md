@@ -33,6 +33,7 @@ flowchart TD
 | [`module_server_browser.go`](../module_server_browser.go) | `browser` | Empty [`ModuleServer`](../module_server_browser.go) stand-in for client-side WASM. |
 | [`screens.go`](../screens.go) | All | Extracts UI screens and entry screens from modules with zone injection. |
 | [`session.go`](../session.go) | All | [`NewSession`](../session.go): compiles `view.Session` with a shared record pool for UI consumption. |
+| [`external_calls.go`](../external_calls.go) | `!browser` | External calls queue adapter, runner, and background executor. |
 | [`browser.go`](../browser.go) | `browser` | [`Browser`](../browser.go): client bootstrap handing `view.Session` to chosen `view.Layout`. |
 | [`brand.go`](../brand.go) / [`brand_ssr.go`](../brand_ssr.go) | All / `!wasm` | Access screen copy and SSR HTML pre-rendering. |
 
@@ -58,6 +59,15 @@ flowchart TD
 2. **Module Construction:** Domain modules register entities and storage operations against the provided database.
 3. **Transport Attachment:** `MountServer` passes `ServerConfig.Events` to both `rpc.Mount` and `mcp.HarvestOps`.
 4. **Write Notification:** Stored entity writes via HTTP REST or MCP announce their commits over this broker to subscribers.
+
+### External Calls Orchestration (D58)
+
+`appkit` serves as the composition root resolving the import cycle between `crud` and `externalcalls`:
+1. `BuildServer` initializes `externalcalls.New` using `d.DB`, `d.IDs`, and `backoff.New(time.Second, 60*time.Second)`.
+2. `NewCallQueue` adapts `*externalcalls.Queue` to `crud.CallQueue` and registers it via `crud.SetDefaultQueue`.
+3. `NewCallRunner` inspects the mounted entities from `App.Modules` to map `(module, entity, call)` to the declared `model.ExternalCallDefinition` and the entity's generated call method (`crud.ExternalCallFunc`).
+4. If any module declares external calls, `StartCallExecutor` periodically invokes `q.RunPendingCalls(runner, 50)` and settles expired `WaitForReply` calls as `failed`.
+5. Database migrations require the `queued_call` table, created by invoking `externalcallsmigrate.Migrate(conn, compiler)`.
 
 ### Browser Session Initialization
 

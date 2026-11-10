@@ -3,6 +3,7 @@
 package appkit
 
 import (
+	"webtyp.com/crud"
 	"webtyp.com/events"
 	"webtyp.com/model"
 	"webtyp.com/orm"
@@ -38,6 +39,7 @@ type Deps struct {
 	TenantID string
 	Zone     time.Zone    // the installation's zone (App.Timezone), loaded once: every local date and hour comes from it
 	Log      func(...any) // the app's log (App.Log); never nil: a no-op when the app declares none
+	Queue    crud.CallQueue
 
 	built *[]model.ModuleNaming
 }
