@@ -401,16 +401,18 @@ func TestMountServer_RestEndToEndOverHTTP(t *testing.T) {
 	defer srv.Close()
 
 	caller := rpc.NewCaller(srv.URL)
+	waitCall := func(op router.Operation, args model.Encodable, into model.Decodable) error {
+		ch := make(chan error, 1)
+		caller.Call(op, args, into, func(err error) { ch <- err })
+		return <-ch
+	}
 
 	// Create
 	var saved tableModel
-	var createErr error
-	caller.Call(router.Operation{Module: "tmod", Entity: "rec", Action: model.Create},
+	if err := waitCall(router.Operation{Module: "tmod", Entity: "rec", Action: model.Create},
 		&crud.CreateArgs{Records: []model.Model{&tableModel{Name: "item1"}}},
-		&saved,
-		func(err error) { createErr = err })
-	if createErr != nil {
-		t.Fatalf("Create: %v", createErr)
+		&saved); err != nil {
+		t.Fatalf("Create: %v", err)
 	}
 	if saved.ID == "" || saved.Name != "item1" {
 		t.Fatalf("saved record invalid: %+v", saved)
@@ -418,67 +420,51 @@ func TestMountServer_RestEndToEndOverHTTP(t *testing.T) {
 
 	// Read by ID
 	var list tableModelList
-	var readErr error
-	caller.Call(router.Operation{Module: "tmod", Entity: "rec", Action: model.Read},
+	if err := waitCall(router.Operation{Module: "tmod", Entity: "rec", Action: model.Read},
 		&crud.ReadArgs{ID: saved.ID},
-		&list,
-		func(err error) { readErr = err })
-	if readErr != nil {
-		t.Fatalf("Read: %v", readErr)
+		&list); err != nil {
+		t.Fatalf("Read: %v", err)
 	}
 	if len(list) != 1 || list[0].ID != saved.ID {
 		t.Fatalf("expected 1 record with id %s, got: %+v", saved.ID, list)
 	}
 
 	// Update (PATCH)
-	var updateErr error
-	caller.Call(router.Operation{Module: "tmod", Entity: "rec", Action: model.Update},
+	if err := waitCall(router.Operation{Module: "tmod", Entity: "rec", Action: model.Update},
 		&crud.UpdateArgs{IDs: []string{saved.ID}, Fields: []string{"name"}, Record: &tableModel{Name: "item1-updated"}},
-		nil,
-		func(err error) { updateErr = err })
-	if updateErr != nil {
-		t.Fatalf("Update: %v", updateErr)
+		nil); err != nil {
+		t.Fatalf("Update: %v", err)
 	}
 
 	// Verify update
 	var listAfterUpdate tableModelList
-	caller.Call(router.Operation{Module: "tmod", Entity: "rec", Action: model.Read},
+	if err := waitCall(router.Operation{Module: "tmod", Entity: "rec", Action: model.Read},
 		&crud.ReadArgs{ID: saved.ID},
-		&listAfterUpdate,
-		func(err error) { readErr = err })
-	if readErr != nil || len(listAfterUpdate) != 1 || listAfterUpdate[0].Name != "item1-updated" {
-		t.Fatalf("update verification failed: %+v", listAfterUpdate)
+		&listAfterUpdate); err != nil || len(listAfterUpdate) != 1 || listAfterUpdate[0].Name != "item1-updated" {
+		t.Fatalf("update verification failed (err: %v): %+v", err, listAfterUpdate)
 	}
 
 	// Delete
-	var deleteErr error
-	caller.Call(router.Operation{Module: "tmod", Entity: "rec", Action: model.Delete},
+	if err := waitCall(router.Operation{Module: "tmod", Entity: "rec", Action: model.Delete},
 		&crud.DeleteArgs{IDs: []string{saved.ID}},
-		nil,
-		func(err error) { deleteErr = err })
-	if deleteErr != nil {
-		t.Fatalf("Delete: %v", deleteErr)
+		nil); err != nil {
+		t.Fatalf("Delete: %v", err)
 	}
 
 	// Verify deleted
 	var listAfterDelete tableModelList
-	var notFoundErr error
-	caller.Call(router.Operation{Module: "tmod", Entity: "rec", Action: model.Read},
+	err := waitCall(router.Operation{Module: "tmod", Entity: "rec", Action: model.Read},
 		&crud.ReadArgs{ID: saved.ID},
-		&listAfterDelete,
-		func(err error) { notFoundErr = err })
-	if notFoundErr == nil {
+		&listAfterDelete)
+	if err == nil {
 		t.Fatalf("expected 404 or not found, got nil error (list: %+v)", listAfterDelete)
 	}
 
 	// GET for an entity the module does not offer answers 404
 	var nonExistentList tableModelList
-	var nonExistentErr error
-	caller.Call(router.Operation{Module: "tmod", Entity: "nonexistent", Action: model.Read},
+	if err := waitCall(router.Operation{Module: "tmod", Entity: "nonexistent", Action: model.Read},
 		&crud.ReadArgs{},
-		&nonExistentList,
-		func(err error) { nonExistentErr = err })
-	if nonExistentErr == nil {
+		&nonExistentList); err == nil {
 		t.Fatal("expected 404 for nonexistent entity, got nil error")
 	}
 }

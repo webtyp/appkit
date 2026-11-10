@@ -4,14 +4,6 @@ import (
 	"webtyp.com/lang"
 )
 
-// Brand is what an app shows on its access screen and its chassis.
-//
-//	var Brand = appkit.Brand{Name: "MJosefa CMS", LogoMark: logo}
-type Brand struct {
-	Name     string
-	LogoMark string // data: URL or path of the logo image
-}
-
 // Texts of the access screens, translated in lang.json.
 const (
 	textLoading lang.Text = "Loading…"

@@ -11,6 +11,7 @@ import (
 	"webtyp.com/ddl"
 	"webtyp.com/model"
 	"webtyp.com/router"
+	"webtyp.com/view"
 )
 
 type dummyEntry struct{}
@@ -70,12 +71,12 @@ func TestBuildServer_WithoutEntryModule(t *testing.T) {
 }
 
 func TestBrand_RenderHTML(t *testing.T) {
-	b := appkit.Brand{Name: "Acme"}
-	html := b.RenderHTML()
+	app := appkit.App{Brand: view.Brand{Name: "Acme"}}
+	html := app.RenderHTML()
 	if !strings.Contains(html, "login__card") {
 		t.Fatalf("expected RenderHTML to contain login__card, got %q", html)
 	}
-	zero := appkit.Brand{}
+	zero := appkit.App{}
 	if zero.RenderHTML() != "" {
 		t.Fatalf("expected zero brand RenderHTML to be empty, got %q", zero.RenderHTML())
 	}

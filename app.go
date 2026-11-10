@@ -20,11 +20,11 @@ var (
 
 // App is the whole application, for both binaries: web/server and web/browser read the same value.
 //
-//	var App = appkit.App{TenantID: "acme", Brand: Brand, Modules: []appkit.Module{access.Module, catalog.Module}, Server: server}
+//	var App = appkit.App{TenantID: "acme", Brand: view.Brand{Name: "acme"}, Modules: []appkit.Module{access.Module, catalog.Module}, Server: server}
 type App struct {
 	TenantID string             // the installation: every module's tenant, the rbac project and the MCP server name
 	Timezone string             // the installation's zone (IANA name), reaches modules as Deps.Zone / view.BrowserDeps.Zone
-	Brand    Brand              // name and logo on the access screen and the chassis
+	Brand    view.Brand         // name and logo on the access screen and the chassis
 	Modules  []Module           // build, migration and menu order; the entry module goes first: appkit.Find finds it among the built modules
 	Server   AppServer          // what only the server binary needs; the app fills it from a !browser file, zero in the browser
 	Log      func(...any)       // required: where the server writes its warnings (log.Println); nil → ErrNoLog, never silence

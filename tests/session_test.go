@@ -165,5 +165,6 @@ func TestLayout_ShowReceivesTheSession(t *testing.T) {
 }
 
 func TestApp_BrandIsViewBrand(t *testing.T) {
-	var _ view.Brand = appkit.App{}.Brand
+	check := func(view.Brand) {}
+	check(appkit.App{}.Brand)
 }

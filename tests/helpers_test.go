@@ -45,7 +45,7 @@ func (m *tableModel) IsNil() bool         { return m == nil }
 
 func (m *tableModel) Schema() []model.Field {
 	return []model.Field{
-		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
+		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true, AutoInc: true}},
 		{Name: "name", Type: model.Text()},
 	}
 }
