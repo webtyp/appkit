@@ -3,7 +3,7 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
-	webtyp.com/crud v0.0.10
+	webtyp.com/crud v0.0.11
 	webtyp.com/ddl v0.0.49
 	webtyp.com/env v0.1.3
 	webtyp.com/events v0.1.8
