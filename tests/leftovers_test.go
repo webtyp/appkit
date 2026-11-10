@@ -48,7 +48,7 @@ func holidayDSN(t *testing.T) string {
 		"INSERT INTO holiday (id, name, label) VALUES ('h1', NULL, 'Navidad')",
 		"INSERT INTO holiday (id, name, label) VALUES ('h2', 'Año nuevo', 'Year')",
 	} {
-		if err := conn.Exec(q); err != nil {
+		if _, err := conn.Exec(q); err != nil {
 			t.Fatal(err)
 		}
 	}

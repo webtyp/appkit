@@ -6,6 +6,7 @@ import (
 
 	"webtyp.com/appkit"
 	"webtyp.com/model"
+	"webtyp.com/router"
 	"webtyp.com/view"
 )
 

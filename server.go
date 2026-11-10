@@ -3,9 +3,8 @@
 package appkit
 
 import (
-	"strings"
-
 	"webtyp.com/crud"
+	"webtyp.com/events"
 	"webtyp.com/fmt"
 	"webtyp.com/mcp"
 	"webtyp.com/model"
@@ -19,6 +18,7 @@ type ServerConfig struct {
 	Authorize   model.Authorizer                                            // nil = deny everything (and log it)
 	Policy      model.PolicyDescriber                                       // optional: role permissions description for /_routes
 	Operations  []crud.Module                                               // published at POST /api/<module>/<op>
+	Events      events.Publisher                                            // the broker writes announce on (crud publishes after each commit); nil = nobody listens
 	Public      []crud.Public                                               // actions visitors may call without a session; nil = none
 	MCPTools    []mcp.ToolName                                              // operations an agent may call; empty = MCP closed
 	APIModules  []router.APIModule                                          // built from AppServer.Infra
@@ -35,7 +35,7 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 	}
 
 	if len(cfg.Operations) > 0 {
-		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Logger, cfg.Public, cfg.Operations...); err != nil {
+		if err := rpc.Mount(r, rpc.DefaultPrefix, cfg.Logger, cfg.Public, cfg.Events, cfg.Operations...); err != nil {
 			return err
 		}
 	}
@@ -44,7 +44,7 @@ func MountServer(r router.Router, cfg ServerConfig) error {
 		return err
 	}
 
-	provider, err := mcp.HarvestOps(cfg.MCPTools, cfg.Operations...)
+	provider, err := mcp.HarvestOps(cfg.Events, cfg.MCPTools, cfg.Operations...)
 	if err != nil {
 		return err
 	}
@@ -86,14 +86,15 @@ func checkPublic(public []crud.Public, ops []crud.Module) error {
 	}
 	actions := []model.Action{model.Create, model.Read, model.Update, model.Delete}
 	for _, p := range public {
+		suffix := "/" + p.Model.ModelName()
 		for _, act := range actions {
 			if !p.Actions.Has(act) {
 				continue
 			}
-			suffix := "/" + crud.Op(p.Model, act)
+			method := rpc.MethodOf(act)
 			found := false
 			for _, r := range routes {
-				if r.Access == model.AccessPublic && strings.HasSuffix(r.Path, suffix) {
+				if r.Access == model.AccessPublic && r.Method == method && fmt.HasSuffix(r.Path, suffix) {
 					found = true
 					break
 				}

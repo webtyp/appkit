@@ -195,6 +195,7 @@ func BuildServer(app App, se ServerEnv, schema ddl.Schema, mounts ...func(r rout
 		Authorize:   authorize,
 		Policy:      policy,
 		Operations:  ops,
+		Events:      d.Events,
 		Public:      app.Server.Public,
 		MCPTools:    app.Server.MCPTools,
 		APIModules:  apis,
