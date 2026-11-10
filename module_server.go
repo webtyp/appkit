@@ -1,25 +1,13 @@
+//go:build !browser
+
 package appkit
 
 import (
-	"errors"
-
 	"webtyp.com/events"
 	"webtyp.com/model"
 	"webtyp.com/orm"
 	"webtyp.com/router"
 	"webtyp.com/time"
-)
-
-// ErrNoProvider and ErrManyProviders are what Find returns when the modules
-// built so far hold zero or more than one value of the requested type.
-var (
-	ErrNoProvider    = errors.New("appkit: no module provides it — list the module that does before the one that needs it in App.Modules")
-	ErrManyProviders = errors.New("appkit: more than one module provides it — keep one in App.Modules")
-	ErrNoTimezone    = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
-	ErrNoLog         = errors.New("appkit: App.Log is nil — set it (log.Println) so the server's warnings are seen")
-	ErrNotCrudModule    = errors.New("appkit: a module builds neither a crud.Module nor Parts — its operations would never be mounted")
-	ErrPublicNotMounted = errors.New("appkit: AppServer.Public names an action no module offers")
-	ErrNoGrants         = errors.New("appkit: a module declares DefaultGrants but AppServer.Grants is nil; set it to the app's rbac service")
 )
 
 type ModuleServer struct {

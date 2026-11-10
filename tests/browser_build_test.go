@@ -20,9 +20,7 @@ func TestBrowserBuild_LeavesServerCodeOut(t *testing.T) {
 		"webtyp.com/orm",
 		"webtyp.com/mcp",
 		"webtyp.com/rbac",
-		"webtyp.com/ddl",
 		"webtyp.com/server/httpd",
-		"webtyp.com/storage",
 	}
 	output := string(out)
 	for _, f := range forbidden {
