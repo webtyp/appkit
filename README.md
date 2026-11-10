@@ -35,7 +35,7 @@ var Module = appkit.Module{Name: "service_catalog", Server: server, Browser: bro
 
 // module/server.go (//go:build !browser)
 var server = appkit.ModuleServer{Build: build}
-var browser appkit.ModuleBrowser
+var browser view.ModuleBrowser
 
 func build(d appkit.Deps) (model.ModuleNaming, error) {
 	return servicecatalog.New(d.DB, servicecatalog.Deps{IDs: d.IDs, Publisher: d.Events, TenantID: d.TenantID})
