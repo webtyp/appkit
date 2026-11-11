@@ -19,7 +19,7 @@ require (
 	webtyp.com/rpc v0.2.21
 	webtyp.com/server v0.2.120
 	webtyp.com/sqlite v0.3.35
-	webtyp.com/storage v0.2.1
+	webtyp.com/storage v0.2.3
 	webtyp.com/time v0.6.5
 	webtyp.com/unixid v0.3.1
 	webtyp.com/view v0.6.71
