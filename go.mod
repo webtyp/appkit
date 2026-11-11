@@ -62,7 +62,7 @@ require (
 	webtyp.com/keyring v0.2.9 // indirect
 	webtyp.com/msgtype v0.1.0 // indirect
 	webtyp.com/pwa v0.2.13 // indirect
-	webtyp.com/sqlt v0.0.17 // indirect
+	webtyp.com/sqlt v0.0.21 // indirect
 	webtyp.com/user v0.3.14 // indirect
 	webtyp.com/webauthn v0.1.16 // indirect
 )
