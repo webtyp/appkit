@@ -3,14 +3,16 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
+	webtyp.com/backoff v0.2.0
 	webtyp.com/crud v0.0.14
 	webtyp.com/ddl v0.0.49
 	webtyp.com/env v0.1.3
 	webtyp.com/events v0.1.8
+	webtyp.com/externalcalls v0.2.0
 	webtyp.com/fmt v1.0.0
 	webtyp.com/lang v0.1.16
 	webtyp.com/mcp v0.3.24
-	webtyp.com/model v0.2.20
+	webtyp.com/model v0.2.21
 	webtyp.com/orm v0.12.33
 	webtyp.com/rbac v0.0.37
 	webtyp.com/router v0.4.21
@@ -47,7 +49,6 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.54.0 // indirect
 	webtyp.com/await v0.1.2 // indirect
-	webtyp.com/backoff v0.2.0 // indirect
 	webtyp.com/base64 v0.0.6 // indirect
 	webtyp.com/calendar v0.1.0 // indirect
 	webtyp.com/context v0.0.23 // indirect
@@ -55,7 +56,6 @@ require (
 	webtyp.com/definitioncheck v0.0.3 // indirect
 	webtyp.com/dom v0.13.29 // indirect
 	webtyp.com/escape v0.1.0 // indirect
-	webtyp.com/externalcalls v0.2.0 // indirect
 	webtyp.com/fetch v0.1.30 // indirect
 	webtyp.com/filepath v0.1.0 // indirect
 	webtyp.com/json v0.5.40 // indirect
