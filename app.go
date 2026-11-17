@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrNoTimezone    = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
-	ErrUnknownSignIn = errors.New("appkit: App.SignIn is not a known method — use appkit.SignInByTrustedIP")
-	ErrNoLog         = errors.New("appkit: App.Log is nil — set it (log.Println) so the server's warnings are seen")
+	ErrNoTimezone          = errors.New("appkit: App.Timezone is empty or not a known time zone — set an IANA name such as America/Santiago")
+	ErrUnknownSignIn       = errors.New("appkit: App.SignIn is not a known method — use appkit.SignInByTrustedIP")
+	ErrNoLog               = errors.New("appkit: App.Log is nil — set it (log.Println) so the server's warnings are seen")
+	ErrUnsupportedIndustry = errors.New("appkit: module does not support the application's industry")
 )
 
 // SignInMethod is how people enter the app. Zero means nobody can: every operation is denied.
@@ -29,6 +30,8 @@ type App struct {
 	TenantID  string                   // the installation: every module's tenant, the rbac project and the MCP server name
 	Timezone  string                   // the installation's zone (IANA name), reaches modules as Deps.Zone / view.BrowserDeps.Zone
 	Countries country.Catalog          // the default country and which come first, reaches modules as Deps.Countries / view.BrowserDeps.Countries
+	Industry  model.Industry           // the business domain of the app (D1, D4-D5); modules must support it
+	Roles     []model.Role             // application roles and their module uses (D3)
 	SignIn    SignInMethod             // how people enter; zero = nobody does and every operation is denied
 	Modules   []model.ModuleDefinition // the modules once and in order: build, migration and menu follow it; whoever provides to another goes first
 	Log       func(...any)             // required: where the app writes its warnings (log.Println); nil → ErrNoLog, never silence

@@ -47,3 +47,5 @@
 | [TestMount_SignInBringsItsOwnRoutes](../tests/kit_test.go) | Con `SignIn`, `Mount` publica el ingreso, la salida y `/me` |
 | [TestMount_WithoutSignInThereAreNoSessionRoutes](../tests/kit_test.go) | Sin `SignIn` no hay rutas de sesión |
 | [TestBuild_SignInUsesTheStaffRegister](../tests/kit_test.go) | El primer administrador llega al registro de personal con la IP de la configuración inicial, y cada ingreso le pregunta por la IP de quien llama |
+| [TestBuild_RejectsUnsupportedIndustry](../tests/configurable_test.go) | Build rejects a module that does not support App.Industry with ErrUnsupportedIndustry |
+| [TestBuild_EnsuresAppRolesAndModuleUseGrants](../tests/configurable_test.go) | Build ensures App.Roles in access and grants permissions per ModuleUse in rbac |

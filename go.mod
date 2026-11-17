@@ -3,11 +3,11 @@ module webtyp.com/appkit
 go 1.26.8
 
 require (
-	webtyp.com/access v0.0.69
-	webtyp.com/auth v0.0.119
+	webtyp.com/access v0.0.70
+	webtyp.com/auth v0.0.120
 	webtyp.com/backoff v0.2.0
 	webtyp.com/country v0.0.2
-	webtyp.com/crud v0.0.15
+	webtyp.com/crud v0.0.18
 	webtyp.com/ddl v0.0.49
 	webtyp.com/dom v0.13.29
 	webtyp.com/events v0.1.15
@@ -18,16 +18,16 @@ require (
 	webtyp.com/json v0.5.40
 	webtyp.com/lang v0.1.16
 	webtyp.com/mcp v0.3.36
-	webtyp.com/model v0.2.24
-	webtyp.com/orm v0.12.33
-	webtyp.com/rbac v0.0.37
+	webtyp.com/model v0.2.25
+	webtyp.com/orm v0.12.37
+	webtyp.com/rbac v0.0.48
 	webtyp.com/router v0.5.0
 	webtyp.com/rpc v0.2.30
 	webtyp.com/sqlite v0.3.35
-	webtyp.com/storage v0.2.3
+	webtyp.com/storage v0.2.8
 	webtyp.com/time v0.6.5
 	webtyp.com/unixid v0.3.1
-	webtyp.com/view v0.6.87
+	webtyp.com/view v0.6.88
 )
 
 require (

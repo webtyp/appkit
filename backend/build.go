@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"webtyp.com/access"
 	"webtyp.com/appkit"
 	"webtyp.com/backoff"
 	"webtyp.com/crud"
@@ -139,6 +140,9 @@ func (out *Built) entry(d *Deps, b Backend, s Server, ops *[]crud.Module) error 
 	if err != nil {
 		return err
 	}
+	if err := ensureAppRoles(out.app, si.access, svc); err != nil {
+		return err
+	}
 	for _, p := range si.parts() {
 		*d.built = append(*d.built, builtModule{name: p.ModelName(), v: p})
 		if o, ok := p.(crud.Module); ok {
@@ -167,6 +171,9 @@ func check(app appkit.App, b Backend, s Server) error {
 // checkParts: every module of App.Modules has exactly one Module, and every Module is in App.Modules.
 func checkParts(app appkit.App, b Backend) error {
 	for _, def := range app.Modules {
+		if !model.SupportsIndustry(def, app.Industry) {
+			return fmt.ErrType(fmt.Err(def.Name, "does not support industry", string(app.Industry)), appkit.ErrUnsupportedIndustry)
+		}
 		if _, ok := partOf(b, def.Name); !ok {
 			return fmt.ErrType(fmt.Err(def.Name), ErrNoPart)
 		}
@@ -195,6 +202,24 @@ func partOf(b Backend, name string) (Module, bool) {
 		}
 	}
 	return Module{}, false
+}
+
+func ensureAppRoles(app appkit.App, acc *access.Module, svc *rbac.Service) error {
+	for _, role := range app.Roles {
+		if err := acc.EnsureRole(role.Code, role.Name, "", nil); err != nil {
+			return err
+		}
+		var roleGrants []model.Grant
+		for _, def := range app.Modules {
+			roleGrants = append(roleGrants, rbac.GrantsForUse(def, role.UseFor(def.Name))...)
+		}
+		if len(roleGrants) > 0 {
+			if err := svc.EnsureGrants(app.TenantID, role.Code, roleGrants); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // buildModules builds app.Modules in order on d.DB, appending each to d.built (so later modules find it).
