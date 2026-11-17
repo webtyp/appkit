@@ -1,6 +1,4 @@
-//go:build !browser
-
-package appkit
+package backend
 
 import (
 	"webtyp.com/access"

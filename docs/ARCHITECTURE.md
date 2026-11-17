@@ -6,9 +6,9 @@
 
 ```mermaid
 flowchart TD
-    App["App<br/>(what it is, the modules once)"] --> Build["Build(App, Backend, Server, dsn, schema)<br/>(!browser)"]
-    App --> Run["RunBrowser(App, Browser, layout)<br/>(browser)"]
-    Build --> Modules["modules in App.Modules order<br/>(BackendModule.Build)"]
+    App["App<br/>(what it is, the modules once)"] --> Build["backend.Build(App, Backend, Server, dsn, schema)"]
+    App --> Run["browser.Run(App, Browser, layout)"]
+    Build --> Modules["modules in App.Modules order<br/>(backend.Module.Build)"]
     Modules --> SignIn["sign-in: auth + rbac + access"]
     SignIn --> Built["Built{Authn, Authorize, Policy}"]
     Built --> Mount["Built.Mount(router)"]
@@ -19,16 +19,18 @@ flowchart TD
 
 ## 2. Files
 
-| File | Destination | Responsibility |
+**Why three packages:** the import graph decides what enters each binary (`appkit` shared, `appkit/backend` server/Worker, `appkit/browser` browser), without any `browser`/`!browser` build tag.
+
+| File | Package / Tag | Responsibility |
 |---|---|---|
-| [`app.go`](../app.go) | All | `App`, `SignInMethod`, shared errors |
-| [`backend.go`](../backend.go) | `!browser` | `Backend`, `BackendModule`, `Server`, `API`, `Agents`, `Parts`, `Deps`, `FindBuiltModule` |
-| [`build.go`](../build.go) | `!browser` | `Build`, `Built.Mount`, `BuildModules`, leftovers check |
-| [`signin_server.go`](../signin_server.go) | `!browser` | The sign-in by trusted IP: users, roles, first administrator, rate limit |
-| [`external_calls.go`](../external_calls.go) | `!browser` | Queue adapter, runner and background executor |
-| [`browser.go`](../browser.go) | `browser` | `Browser`, `BrowserModule`, `RunBrowser`, `NewSession`, `Screens` |
-| [`signin_browser.go`](../signin_browser.go) | `browser` | Login and first-setup screens, users and roles administration |
-| [`render_ssr.go`](../render_ssr.go) | `!wasm` | `App.RenderHTML` |
+| [`app.go`](../app.go) | `appkit` | `App`, `SignInMethod`, shared errors |
+| [`backend/backend.go`](../backend/backend.go) | `appkit/backend` | `Backend`, `Module`, `Server`, `API`, `Agents`, `Parts`, `Deps`, `FindBuiltModule` |
+| [`backend/build.go`](../backend/build.go) | `appkit/backend` | `Build`, `Built.Mount`, `BuildModules`, leftovers check |
+| [`backend/signin.go`](../backend/signin.go) | `appkit/backend` | The sign-in by trusted IP: users, roles, first administrator, rate limit |
+| [`backend/external_calls.go`](../backend/external_calls.go) | `appkit/backend` | Queue adapter, runner and background executor |
+| [`browser/browser.go`](../browser/browser.go) | `appkit/browser` | `Browser`, `Module`, `Run`, `NewSession`, `Screens` |
+| [`browser/signin.go`](../browser/signin.go) | `appkit/browser` | Login and first-setup screens, users and roles administration |
+| [`render_ssr.go`](../render_ssr.go) | `appkit` (`!wasm`) | `App.RenderHTML` |
 
 ## 3. Flows
 

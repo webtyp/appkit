@@ -2,6 +2,21 @@
   "languages": ["es", "zh", "hi", "ar", "pt", "fr", "de", "ru"],
   "keys": {
     "Loading…": ["Cargando…", "加载中…", "लोड हो रहा है…", "جارٍ التحميل…", "Carregando…", "Chargement…", "Wird geladen…", "Загрузка…"],
-    "Log out": ["Cerrar sesión", "退出登录", "लॉग आउट", "تسجيل الخروج", "Sair", "Se déconnecter", "Abmelden", "Выйти"]
+    "Log out": ["Cerrar sesión", "退出登录", "लॉग आउट", "تسجيل الخروج", "Sair", "Se déconnecter", "Abmelden", "Выйти"],
+    "appkit: Backend.API is nil — give it the transport that publishes the operations (rpc.JSON{})": ["", "", "", "", "", "", "", ""],
+    "appkit: Backend.Events is nil — give it a broker (inprocess.Broker{})": ["", "", "", "", "", "", "", ""],
+    "appkit: BuildModules got no database — pass the *orm.DB of the transaction the import runs in": ["", "", "", "", "", "", "", ""],
+    "appkit: Server.NewIDs is nil — give it the id generator (unixid.NewUnixID)": ["", "", "", "", "", "", "", ""],
+    "appkit: a BackendModule has no Build — set how the module is constructed": ["", "", "", "", "", "", "", ""],
+    "appkit: a database address is set but Server.Database is nil — give it the database driver (postgres.Open)": ["", "", "", "", "", "", "", ""],
+    "appkit: a module builds neither a crud.Module nor Parts — its operations would never be mounted": ["", "", "", "", "", "", "", ""],
+    "appkit: a module declares DefaultGrants but the database has no rbac to hold them": ["", "", "", "", "", "", "", ""],
+    "appkit: a module of App.Modules has no part in the list that must hold it — add one with the module's Name": ["", "", "", "", "", "", "", ""],
+    "appkit: a part names a module that is not in App.Modules — list it there, in build order": ["", "", "", "", "", "", "", ""],
+    "appkit: missing store or newList for entity": ["", "", "", "", "", "", "", ""],
+    "appkit: no module with that name is built — list it before the one that needs it in App.Modules": ["", "", "", "", "", "", "", ""],
+    "appkit: unknown call func for call": ["", "", "", "", "", "", "", ""],
+    "appkit: unknown call target for module": ["", "", "", "", "", "", "", ""],
+    "entity": ["", "", "", "", "", "", "", ""]
   }
 }

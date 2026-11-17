@@ -1,4 +1,4 @@
-//go:build !wasm && !browser
+//go:build !wasm
 
 package tests
 
@@ -9,7 +9,7 @@ import (
 )
 
 func TestBrowserBuild_AppkitImportsNoServerCode(t *testing.T) {
-	cmd := exec.Command("go", "list", "-tags", "browser", "-f", "{{join .Imports \"\\n\"}}", ".")
+	cmd := exec.Command("go", "list", "-f", "{{join .Imports \"\\n\"}}", ".", "./browser")
 	cmd.Dir = ".."
 	cmd.Env = append(cmd.Environ(), "GOOS=js", "GOARCH=wasm")
 	out, err := cmd.CombinedOutput()

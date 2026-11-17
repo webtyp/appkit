@@ -1,6 +1,4 @@
-//go:build !browser
-
-package appkit
+package backend
 
 import (
 	"webtyp.com/country"
@@ -31,20 +29,20 @@ var (
 // Backend is what runs in the backend, the same in the native server and in a Worker: how each module is built, the
 // transports and the broker. The database and the ids depend on the platform and live in Server.
 //
-//	var Backend = appkit.Backend{Events: &inprocess.Broker{}, API: rpc.JSON{}, Agents: mcp.Tools{Allowed: MCPTools()}, Modules: parts}
+//	var Backend = backend.Backend{Events: &inprocess.Broker{}, API: rpc.JSON{}, Agents: mcp.Tools{Allowed: MCPTools()}, Modules: parts}
 type Backend struct {
 	Events  events.Broker         // the notices between modules, in the same process (inprocess.Broker{})
 	API     API                   // publishes the operations (rpc.JSON{})
 	Agents  Agents                // lets an agent call some of them (mcp.Tools{Allowed: …}); nil = no agent endpoint
 	Public  []crud.Public         // actions visitors may call without a session; nil = none
 	Routes  func(r router.Router) // the app's own routes; nil = none
-	Modules []BackendModule       // how each module of App.Modules is built, found by Name
+	Modules []Module              // how each module of App.Modules is built, found by Name
 }
 
-// BackendModule is how one module is constructed on the backend. Name is the module's Definition.Name.
+// Module is how one module is constructed on the backend. Name is the module's Definition.Name.
 //
-//	appkit.BackendModule{Name: devicemanager.Definition.Name, Build: func(d appkit.Deps) (model.ModuleNaming, error) { return devicemanager.New(d.DB, devicemanager.Deps{IDs: d.IDs}) }}
-type BackendModule struct {
+//	backend.Module{Name: devicemanager.Definition.Name, Build: func(d backend.Deps) (model.ModuleNaming, error) { return devicemanager.New(d.DB, devicemanager.Deps{IDs: d.IDs}) }}
+type Module struct {
 	Name          string
 	Build         func(d Deps) (model.ModuleNaming, error)
 	DefaultGrants []model.Grant // what any signed-in person may do with this module (granted to rbac.RoleAuthenticated)
@@ -52,7 +50,7 @@ type BackendModule struct {
 
 // Server is what only the native server decides, because it depends on the platform: a Worker has its own (config/edge.go).
 //
-//	var Server = appkit.Server{Database: postgres.Open, NewIDs: func() (model.IDGenerator, error) { return unixid.NewUnixID() }}
+//	var Server = backend.Server{Database: postgres.Open, NewIDs: func() (model.IDGenerator, error) { return unixid.NewUnixID() }}
 type Server struct {
 	Database func(dsn string) (storage.Conn, error) // the driver (postgres.Open); nil = no database
 	NewIDs   func() (model.IDGenerator, error)      // how ids are created
@@ -91,7 +89,7 @@ type Deps struct {
 	built *[]builtModule
 }
 
-// builtModule is a built module and the name it is found by: its BackendModule.Name, or a part's ModelName().
+// builtModule is a built module and the name it is found by: its Module.Name, or a part's ModelName().
 type builtModule struct {
 	name string
 	v    model.ModuleNaming
@@ -100,7 +98,7 @@ type builtModule struct {
 // FindBuiltModule returns the module already built with that name (Definition.Name), so the app can hand one
 // module what another provides without either importing the other. The caller asserts the type in one line.
 //
-//	m, err := appkit.FindBuiltModule(d, devicemanager.Definition.Name)
+//	m, err := backend.FindBuiltModule(d, devicemanager.Definition.Name)
 //	dm, ok := m.(*devicemanager.Module)
 func FindBuiltModule(d Deps, name string) (model.ModuleNaming, error) {
 	if d.built != nil {

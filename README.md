@@ -20,9 +20,9 @@ With appkit, the app declares `App` (what it is, its modules once), `Backend` (h
 ## Before You Start
 
 - **Only the app imports `appkit`.** Modules and `access` never do. `appkit` imports no database driver, HTTP server, transport, id generator or broker: the app passes them in.
-- Platform axes: `App` has no tag (server, Worker and browser read it); `Backend`, `Server` build files are `!browser`; `Browser`, `RunBrowser` and the sign-in screens are `browser`.
+- **Why three packages:** `appkit` (only `App` and shared errors), `appkit/backend` (`Backend`, `Server`, `Build`) and `appkit/browser` (`Browser`, `Run`, `NewSession`). The import graph decides what enters each binary — no `browser`/`!browser` build tag needed.
 - Modules are built, migrated and shown in `App.Modules` order; whoever provides to another goes first. The first screen is the one opened first.
-- A listed module without its `BackendModule` (or `BrowserModule`) is an error at start that names it; so is a part whose module is not listed.
+- A listed module without its `backend.Module` (or `browser.Module`) is an error at start that names it; so is a part whose module is not listed.
 
 ## Step-by-Step Guide
 
@@ -38,32 +38,32 @@ var App = appkit.App{
 }
 ```
 
-2. **The backend** — `config/backend.go` (`!browser`: server and Worker):
+2. **The backend** — `config/services/backend.go` (server and Worker):
 
 ```go
-var Backend = appkit.Backend{
+var Backend = backend.Backend{
 	Events: &inprocess.Broker{}, API: rpc.JSON{}, Agents: mcp.Tools{Allowed: MCPTools()},
-	Modules: []appkit.BackendModule{
-		{Name: catalog.Definition.Name, Build: func(d appkit.Deps) (model.ModuleNaming, error) {
+	Modules: []backend.Module{
+		{Name: catalog.Definition.Name, Build: func(d backend.Deps) (model.ModuleNaming, error) {
 			return catalog.New(d.DB, catalog.Deps{IDs: d.IDs, Publisher: d.Events, TenantID: d.TenantID})
 		}},
-		{Name: staff.Definition.Name, Build: buildStaff}, // asks device_manager for its devices with appkit.FindBuiltModule
+		{Name: staff.Definition.Name, Build: buildStaff}, // asks device_manager for its devices with backend.FindBuiltModule
 	},
 }
 ```
 
-3. **The native server** — `config/server.go` (`!wasm`; a Worker adds `config/edge.go`):
+3. **The native server** — `config/services/server.go` (`!wasm`; a Worker adds `config/services/edge.go`):
 
 ```go
-var Server = appkit.Server{Database: postgres.Open, NewIDs: func() (model.IDGenerator, error) { return unixid.NewUnixID() }}
+var Server = backend.Server{Database: postgres.Open, NewIDs: func() (model.IDGenerator, error) { return unixid.NewUnixID() }}
 ```
 
-4. **The browser** — `config/browser.go` (`browser`):
+4. **The browser** — `config/screens/browser.go`:
 
 ```go
-var Browser = appkit.Browser{
+var Browser = browser.Browser{
 	Caller: rpc.NewCaller(""), NewIDs: func() (model.IDGenerator, error) { return unixid.NewUnixID() },
-	Modules: []appkit.BrowserModule{{Name: catalog.Definition.Name, Screens: catalogui.Screens}}, // Screens(d view.BrowserDeps)
+	Modules: []browser.Module{{Name: catalog.Definition.Name, Screens: catalogui.Screens}}, // Screens(d view.BrowserDeps)
 }
 ```
 
@@ -71,24 +71,24 @@ var Browser = appkit.Browser{
 
 ```go
 // web/browser/main.go
-func main() { appkit.RunBrowser(config.App, config.Browser, layoutapp.New(devtools.Menu())) }
+func main() { browser.Run(config.App, screens.Browser, layoutapp.New(devtools.Menu())) }
 
 // web/server/main.go — the HTTP server is created between Build and Mount because httpd.Config needs the three values Build returns
-built, err := appkit.Build(config.App, config.Backend, config.Server, dsn, config.Schema)
+built, err := backend.Build(config.App, services.Backend, services.Server, dsn, services.Schema)
 srv := httpd.New(httpd.Config{ /* … */ Authn: built.Authn, Authorize: built.Authorize, Policy: built.Policy})
-err = built.Mount(srv.Router(), devtools.Server(config.Schema)...)
+err = built.Mount(srv.Router(), devtools.Server(services.Schema)...)
 ```
 
 `Log` and `Timezone` are **required** (`ErrNoLog`, `ErrNoTimezone`). `Build` also logs, one line each, the columns the models no longer have but that hold data; it never drops them.
 
 ### Default grants and external calls
 
-What any signed-in person may do with a module is `BackendModule.DefaultGrants`, ensured at boot on `rbac.RoleAuthenticated` with the rbac that `appkit` builds itself.
+What any signed-in person may do with a module is `backend.Module.DefaultGrants`, ensured at boot on `rbac.RoleAuthenticated` with the rbac that `appkit` builds itself.
 When entities declare `ExternalCalls`, `Build` creates the durable queue (`webtyp.com/externalcalls`), fills `Deps.Queue`, sets `crud.SetDefaultQueue` and starts the periodic executor. They need the `queued_call` table: add `externalcallsmigrate.Migrate` from `webtyp.com/externalcalls/migrate` to the migration steps.
 
 ### Importing history
 
-`appkit.BuildModules(config.App, config.Backend, config.Server, tx)` builds the modules on a transaction (the sign-in is not built): an import finds them with `FindBuiltModule` and every write rolls back with it.
+`backend.BuildModules(config.App, services.Backend, services.Server, tx)` builds the modules on a transaction (the sign-in is not built): an import finds them with `FindBuiltModule` and every write rolls back with it.
 
 ## Documentation Map
 
@@ -97,9 +97,9 @@ When entities declare `ExternalCalls`, `Build` creates the durable queue (`webty
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design and decisions |
 | [`docs/TESTS.md`](docs/TESTS.md) | Test suite inventory |
 | [`app.go`](app.go) | `App`, `SignInMethod` |
-| [`backend.go`](backend.go) | `Backend`, `BackendModule`, `Server`, `API`, `Agents`, `Deps`, `FindBuiltModule` |
-| [`build.go`](build.go) | `Build`, `Built.Mount`, `BuildModules` |
-| [`signin_server.go`](signin_server.go) / [`signin_browser.go`](signin_browser.go) | The sign-in by trusted IP, server and screens |
-| [`browser.go`](browser.go) | `Browser`, `BrowserModule`, `RunBrowser`, `NewSession` |
-| [`external_calls.go`](external_calls.go) | `NewCallQueue`, `NewCallRunner`, `StartCallExecutor` |
+| [`backend/backend.go`](backend/backend.go) | `Backend`, `Module`, `Server`, `API`, `Agents`, `Deps`, `FindBuiltModule` |
+| [`backend/build.go`](backend/build.go) | `Build`, `Built.Mount`, `BuildModules` |
+| [`backend/signin.go`](backend/signin.go) / [`browser/signin.go`](browser/signin.go) | The sign-in by trusted IP, server and screens |
+| [`browser/browser.go`](browser/browser.go) | `Browser`, `Module`, `Run`, `NewSession` |
+| [`backend/external_calls.go`](backend/external_calls.go) | `NewCallQueue`, `NewCallRunner`, `StartCallExecutor` |
 | [`render_ssr.go`](render_ssr.go) | `App.RenderHTML`: the loading card before the wasm downloads |

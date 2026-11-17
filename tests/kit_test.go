@@ -1,4 +1,4 @@
-//go:build !wasm && !browser
+//go:build !wasm
 
 package tests
 
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/appkit/backend"
 	"webtyp.com/auth"
 	"webtyp.com/crud"
 	"webtyp.com/ddl"
@@ -29,27 +30,27 @@ func openMem(string) (storage.Conn, error) { return mem.New(), nil }
 func newIDs() (model.IDGenerator, error) { return unixid.NewUnixID() }
 
 // part is how the backend builds one module of the app.
-func part(name string, build func(d appkit.Deps) (model.ModuleNaming, error)) appkit.BackendModule {
-	return appkit.BackendModule{Name: name, Build: build}
+func part(name string, build func(d backend.Deps) (model.ModuleNaming, error)) backend.Module {
+	return backend.Module{Name: name, Build: build}
 }
 
-func returns(v model.ModuleNaming) func(appkit.Deps) (model.ModuleNaming, error) {
-	return func(appkit.Deps) (model.ModuleNaming, error) { return v, nil }
+func returns(v model.ModuleNaming) func(backend.Deps) (model.ModuleNaming, error) {
+	return func(backend.Deps) (model.ModuleNaming, error) { return v, nil }
 }
 
 // kit is an app, its backend and its server, the way an app's config/ declares them.
-func kit(parts ...appkit.BackendModule) (appkit.App, appkit.Backend, appkit.Server) {
+func kit(parts ...backend.Module) (appkit.App, backend.Backend, backend.Server) {
 	app := appkit.App{TenantID: "t1", Timezone: "America/Santiago", Log: func(...any) {}}
 	for _, p := range parts {
 		app.Modules = append(app.Modules, model.ModuleDefinition{Name: p.Name})
 	}
-	b := appkit.Backend{Events: &inprocess.Broker{}, API: rpc.JSON{}, Modules: parts}
-	return app, b, appkit.Server{Database: openMem, NewIDs: newIDs}
+	b := backend.Backend{Events: &inprocess.Broker{}, API: rpc.JSON{}, Modules: parts}
+	return app, b, backend.Server{Database: openMem, NewIDs: newIDs}
 }
 
-func build(t *testing.T, app appkit.App, b appkit.Backend, s appkit.Server) *appkit.Built {
+func build(t *testing.T, app appkit.App, b backend.Backend, s backend.Server) *backend.Built {
 	t.Helper()
-	built, err := appkit.Build(app, b, s, "mem", ddl.Schema{})
+	built, err := backend.Build(app, b, s, "mem", ddl.Schema{})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -72,8 +73,8 @@ func TestFindBuiltModule_ReturnsTheModuleBuiltBefore(t *testing.T) {
 	var got categorySource
 	app, b, s := kit(
 		part("provider", returns(providerMod{namedMod{"provider"}})),
-		part("consumer", func(d appkit.Deps) (model.ModuleNaming, error) {
-			m, err := appkit.FindBuiltModule(d, "provider")
+		part("consumer", func(d backend.Deps) (model.ModuleNaming, error) {
+			m, err := backend.FindBuiltModule(d, "provider")
 			if err != nil {
 				return nil, err
 			}
@@ -93,25 +94,25 @@ func TestFindBuiltModule_ReturnsTheModuleBuiltBefore(t *testing.T) {
 
 func TestFindBuiltModule_ProviderAfterConsumerNamesTheMissingOne(t *testing.T) {
 	app, b, s := kit(
-		part("consumer", func(d appkit.Deps) (model.ModuleNaming, error) {
-			_, err := appkit.FindBuiltModule(d, "provider")
+		part("consumer", func(d backend.Deps) (model.ModuleNaming, error) {
+			_, err := backend.FindBuiltModule(d, "provider")
 			return nil, err
 		}),
 		part("provider", returns(providerMod{namedMod{"provider"}})),
 	)
-	_, err := appkit.Build(app, b, s, "mem", ddl.Schema{})
-	if !errors.Is(err, appkit.ErrNoModuleBuilt) || !strings.Contains(err.Error(), "provider") || !strings.HasPrefix(err.Error(), "consumer: ") {
+	_, err := backend.Build(app, b, s, "mem", ddl.Schema{})
+	if !errors.Is(err, backend.ErrNoModuleBuilt) || !strings.Contains(err.Error(), "provider") || !strings.HasPrefix(err.Error(), "consumer: ") {
 		t.Fatalf("want ErrNoModuleBuilt naming provider, prefixed by consumer, got %v", err)
 	}
 }
 
 func TestBuild_ModulesAreBuiltInAppOrder(t *testing.T) {
 	var order []string
-	mk := func(n string) appkit.BackendModule {
-		return part(n, func(appkit.Deps) (model.ModuleNaming, error) { order = append(order, n); return namedMod{n}, nil })
+	mk := func(n string) backend.Module {
+		return part(n, func(backend.Deps) (model.ModuleNaming, error) { order = append(order, n); return namedMod{n}, nil })
 	}
 	app, b, s := kit(mk("a"), mk("b"), mk("c"))
-	b.Modules = []appkit.BackendModule{mk("c"), mk("a"), mk("b")} // the list order of the parts does not decide
+	b.Modules = []backend.Module{mk("c"), mk("a"), mk("b")} // the list order of the parts does not decide
 	build(t, app, b, s)
 	if strings.Join(order, "") != "abc" {
 		t.Fatalf("modules must be built in App.Modules order, got %v", order)
@@ -121,7 +122,7 @@ func TestBuild_ModulesAreBuiltInAppOrder(t *testing.T) {
 func TestBuild_ModuleWithoutItsPartIsAnError(t *testing.T) {
 	app, b, s := kit(part("a", returns(namedMod{"a"})))
 	app.Modules = append(app.Modules, model.ModuleDefinition{Name: "orphan"})
-	if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, appkit.ErrNoPart) || !strings.Contains(err.Error(), "orphan") {
+	if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, backend.ErrNoPart) || !strings.Contains(err.Error(), "orphan") {
 		t.Fatalf("want ErrNoPart naming orphan, got %v", err)
 	}
 }
@@ -129,21 +130,21 @@ func TestBuild_ModuleWithoutItsPartIsAnError(t *testing.T) {
 func TestBuild_PartOfAnUnlistedModuleIsAnError(t *testing.T) {
 	app, b, s := kit(part("a", returns(namedMod{"a"})))
 	b.Modules = append(b.Modules, part("stray", returns(namedMod{"stray"})))
-	if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, appkit.ErrUnlistedPart) || !strings.Contains(err.Error(), "stray") {
+	if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, backend.ErrUnlistedPart) || !strings.Contains(err.Error(), "stray") {
 		t.Fatalf("want ErrUnlistedPart naming stray, got %v", err)
 	}
 }
 
 func TestBuild_PartWithoutBuildIsAnError(t *testing.T) {
-	app, b, s := kit(appkit.BackendModule{Name: "a"})
-	if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, appkit.ErrNoBuildFunc) {
+	app, b, s := kit(backend.Module{Name: "a"})
+	if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, backend.ErrNoBuildFunc) {
 		t.Fatalf("want ErrNoBuildFunc, got %v", err)
 	}
 }
 
 func TestBuild_ModuleErrorIsNamed(t *testing.T) {
-	app, b, s := kit(part("bad", func(appkit.Deps) (model.ModuleNaming, error) { return nil, errors.New("boom") }))
-	if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); err == nil || !strings.Contains(err.Error(), "bad: boom") {
+	app, b, s := kit(part("bad", func(backend.Deps) (model.ModuleNaming, error) { return nil, errors.New("boom") }))
+	if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); err == nil || !strings.Contains(err.Error(), "bad: boom") {
 		t.Fatalf("want an error containing 'bad: boom', got %v", err)
 	}
 }
@@ -154,7 +155,7 @@ func (notCrud) ModelName() string { return "x" }
 
 func TestBuild_NeitherCrudNorPartsIsAnError(t *testing.T) {
 	app, b, s := kit(part("x", returns(notCrud{})))
-	if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, appkit.ErrNotCrudModule) {
+	if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, backend.ErrNotCrudModule) {
 		t.Fatalf("want ErrNotCrudModule, got %v", err)
 	}
 }
@@ -170,9 +171,9 @@ func TestBuild_PartsAreFoundLikeModules(t *testing.T) {
 	var seen model.ModuleNaming
 	app, b, s := kit(
 		part("people", returns(withParts{namedMod{"people"}, []model.ModuleNaming{namedMod{"users"}, namedMod{"roles"}}})),
-		part("after", func(d appkit.Deps) (model.ModuleNaming, error) {
+		part("after", func(d backend.Deps) (model.ModuleNaming, error) {
 			var err error
-			seen, err = appkit.FindBuiltModule(d, "roles")
+			seen, err = backend.FindBuiltModule(d, "roles")
 			return namedMod{"after"}, err
 		}),
 	)
@@ -183,8 +184,8 @@ func TestBuild_PartsAreFoundLikeModules(t *testing.T) {
 }
 
 func TestBuild_DepsCarryTheInstallation(t *testing.T) {
-	var d appkit.Deps
-	app, b, s := kit(part("a", func(got appkit.Deps) (model.ModuleNaming, error) { d = got; return namedMod{"a"}, nil }))
+	var d backend.Deps
+	app, b, s := kit(part("a", func(got backend.Deps) (model.ModuleNaming, error) { d = got; return namedMod{"a"}, nil }))
 	build(t, app, b, s)
 	if d.Zone.Name() != "America/Santiago" || d.TenantID != "t1" || d.DB == nil || d.IDs == nil || d.Events == nil || d.Queue == nil || d.Log == nil {
 		t.Fatalf("Deps incomplete: %+v", d)
@@ -194,21 +195,21 @@ func TestBuild_DepsCarryTheInstallation(t *testing.T) {
 func TestBuild_WhatTheAppForgotIsNamed(t *testing.T) {
 	cases := []struct {
 		name   string
-		change func(*appkit.App, *appkit.Backend, *appkit.Server)
+		change func(*appkit.App, *backend.Backend, *backend.Server)
 		want   error
 	}{
-		{"no log", func(a *appkit.App, _ *appkit.Backend, _ *appkit.Server) { a.Log = nil }, appkit.ErrNoLog},
-		{"no events", func(_ *appkit.App, b *appkit.Backend, _ *appkit.Server) { b.Events = nil }, appkit.ErrNoEvents},
-		{"no api", func(_ *appkit.App, b *appkit.Backend, _ *appkit.Server) { b.API = nil }, appkit.ErrNoAPI},
-		{"no ids", func(_ *appkit.App, _ *appkit.Backend, s *appkit.Server) { s.NewIDs = nil }, appkit.ErrNoIDs},
-		{"no database driver", func(_ *appkit.App, _ *appkit.Backend, s *appkit.Server) { s.Database = nil }, appkit.ErrNoOpen},
-		{"bad timezone", func(a *appkit.App, _ *appkit.Backend, _ *appkit.Server) { a.Timezone = "Mars/Base" }, appkit.ErrNoTimezone},
-		{"unknown sign-in", func(a *appkit.App, _ *appkit.Backend, _ *appkit.Server) { a.SignIn = 99 }, appkit.ErrUnknownSignIn},
+		{"no log", func(a *appkit.App, _ *backend.Backend, _ *backend.Server) { a.Log = nil }, appkit.ErrNoLog},
+		{"no events", func(_ *appkit.App, b *backend.Backend, _ *backend.Server) { b.Events = nil }, backend.ErrNoEvents},
+		{"no api", func(_ *appkit.App, b *backend.Backend, _ *backend.Server) { b.API = nil }, backend.ErrNoAPI},
+		{"no ids", func(_ *appkit.App, _ *backend.Backend, s *backend.Server) { s.NewIDs = nil }, backend.ErrNoIDs},
+		{"no database driver", func(_ *appkit.App, _ *backend.Backend, s *backend.Server) { s.Database = nil }, backend.ErrNoOpen},
+		{"bad timezone", func(a *appkit.App, _ *backend.Backend, _ *backend.Server) { a.Timezone = "Mars/Base" }, appkit.ErrNoTimezone},
+		{"unknown sign-in", func(a *appkit.App, _ *backend.Backend, _ *backend.Server) { a.SignIn = 99 }, appkit.ErrUnknownSignIn},
 	}
 	for _, c := range cases {
 		app, b, s := kit(part("a", returns(namedMod{"a"})))
 		c.change(&app, &b, &s)
-		if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, c.want) {
+		if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, c.want) {
 			t.Errorf("%s: want %v, got %v", c.name, c.want, err)
 		}
 	}
@@ -216,8 +217,8 @@ func TestBuild_WhatTheAppForgotIsNamed(t *testing.T) {
 
 func TestBuild_WithoutAddressBuildsNothingAndDeniesAll(t *testing.T) {
 	built := false
-	app, b, s := kit(part("a", func(appkit.Deps) (model.ModuleNaming, error) { built = true; return namedMod{"a"}, nil }))
-	got, err := appkit.Build(app, b, s, "", ddl.Schema{})
+	app, b, s := kit(part("a", func(backend.Deps) (model.ModuleNaming, error) { built = true; return namedMod{"a"}, nil }))
+	got, err := backend.Build(app, b, s, "", ddl.Schema{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +257,7 @@ func TestBuild_SignInByTrustedIPGivesTheSessionAndTheRoles(t *testing.T) {
 
 func TestBuild_DefaultGrantsGoToTheAuthenticatedRole(t *testing.T) {
 	conn := mem.New()
-	app, b, s := kit(appkit.BackendModule{Name: "a", Build: returns(namedMod{"a"}), DefaultGrants: []model.Grant{{Resource: "fake", Actions: model.Read}}})
+	app, b, s := kit(backend.Module{Name: "a", Build: returns(namedMod{"a"}), DefaultGrants: []model.Grant{{Resource: "fake", Actions: model.Read}}})
 	s.Database = func(string) (storage.Conn, error) { return conn, nil }
 	build(t, app, b, s)
 	svc, err := rbac.New(orm.New(conn))
@@ -270,7 +271,7 @@ func TestBuild_DefaultGrantsGoToTheAuthenticatedRole(t *testing.T) {
 
 func TestBuildModules_NeedsADatabase(t *testing.T) {
 	app, b, s := kit()
-	if _, err := appkit.BuildModules(app, b, s, nil); !errors.Is(err, appkit.ErrNoDatabase) {
+	if _, err := backend.BuildModules(app, b, s, nil); !errors.Is(err, backend.ErrNoDatabase) {
 		t.Fatalf("want ErrNoDatabase, got %v", err)
 	}
 }
@@ -278,32 +279,32 @@ func TestBuildModules_NeedsADatabase(t *testing.T) {
 func TestBuildModules_BuildsOnTheGivenDatabaseInOrder(t *testing.T) {
 	var db *orm.DB
 	app, b, s := kit(
-		part("a", func(d appkit.Deps) (model.ModuleNaming, error) { db = d.DB; return namedMod{"a"}, nil }),
-		part("b", func(d appkit.Deps) (model.ModuleNaming, error) {
-			_, err := appkit.FindBuiltModule(d, "a")
+		part("a", func(d backend.Deps) (model.ModuleNaming, error) { db = d.DB; return namedMod{"a"}, nil }),
+		part("b", func(d backend.Deps) (model.ModuleNaming, error) {
+			_, err := backend.FindBuiltModule(d, "a")
 			return namedMod{"b"}, err
 		}),
 	)
 	tx := orm.New(mem.New())
-	d, err := appkit.BuildModules(app, b, s, tx)
+	d, err := backend.BuildModules(app, b, s, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if db != tx || d.DB != tx {
 		t.Fatal("modules must be built on the transaction the import passes")
 	}
-	if _, err := appkit.FindBuiltModule(d, "b"); err != nil {
+	if _, err := backend.FindBuiltModule(d, "b"); err != nil {
 		t.Fatalf("the returned Deps must find the built modules: %v", err)
 	}
 }
 
 func TestBuildModules_ErrorsAreNamed(t *testing.T) {
-	app, b, s := kit(part("bad", func(appkit.Deps) (model.ModuleNaming, error) { return nil, errors.New("boom") }))
-	if _, err := appkit.BuildModules(app, b, s, orm.New(mem.New())); err == nil || !strings.Contains(err.Error(), "bad: boom") {
+	app, b, s := kit(part("bad", func(backend.Deps) (model.ModuleNaming, error) { return nil, errors.New("boom") }))
+	if _, err := backend.BuildModules(app, b, s, orm.New(mem.New())); err == nil || !strings.Contains(err.Error(), "bad: boom") {
 		t.Fatalf("want 'bad: boom', got %v", err)
 	}
 	app.Timezone = "Mars/Base"
-	if _, err := appkit.BuildModules(app, b, s, orm.New(mem.New())); !errors.Is(err, appkit.ErrNoTimezone) {
+	if _, err := backend.BuildModules(app, b, s, orm.New(mem.New())); !errors.Is(err, appkit.ErrNoTimezone) {
 		t.Fatalf("want ErrNoTimezone, got %v", err)
 	}
 }
@@ -321,7 +322,7 @@ func TestApp_RenderHTMLNeedsAName(t *testing.T) {
 // ---- Mount ----
 
 // mounted builds the app and mounts it on a mock router that authenticates as `test-user` and allows only fake:read.
-func mounted(t *testing.T, app appkit.App, b appkit.Backend, s appkit.Server, authn router.Middleware, mounts ...func(router.Router, model.PolicyDescriber) error) (*mock.Router, error) {
+func mounted(t *testing.T, app appkit.App, b backend.Backend, s backend.Server, authn router.Middleware, mounts ...func(router.Router, model.PolicyDescriber) error) (*mock.Router, error) {
 	t.Helper()
 	built := build(t, app, b, s)
 	r := &mock.Router{}
@@ -330,7 +331,7 @@ func mounted(t *testing.T, app appkit.App, b appkit.Backend, s appkit.Server, au
 	return r, err
 }
 
-func fakeKit() (appkit.App, appkit.Backend, appkit.Server) {
+func fakeKit() (appkit.App, backend.Backend, backend.Server) {
 	return kit(part("fake", returns(fakeOps{})))
 }
 

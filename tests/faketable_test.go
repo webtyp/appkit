@@ -1,4 +1,4 @@
-//go:build !wasm && !browser
+//go:build !wasm
 
 package tests
 

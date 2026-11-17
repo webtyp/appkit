@@ -1,4 +1,4 @@
-//go:build !wasm && !browser
+//go:build !wasm
 
 package tests
 
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"webtyp.com/appkit"
+	"webtyp.com/appkit/backend"
 	"webtyp.com/backoff"
 	"webtyp.com/crud"
 	"webtyp.com/ddl"
@@ -232,7 +232,7 @@ func TestCallQueueAdapter_AllMethods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("externalcalls.New: %v", err)
 	}
-	adapter := appkit.NewCallQueue(q)
+	adapter := backend.NewCallQueue(q)
 	if adapter == nil {
 		t.Fatalf("expected non-nil adapter")
 	}
@@ -319,7 +319,7 @@ func TestCallRunner_DeclarationAndRun(t *testing.T) {
 		calls: make(map[string]int),
 	}
 
-	runner := appkit.NewCallRunner([]crud.Module{mod})
+	runner := backend.NewCallRunner([]crud.Module{mod})
 
 	// Declaration check
 	def, ok := runner.Declaration("test_module", "test_record", "charge")
@@ -358,7 +358,7 @@ func TestCallRunner_DeclarationAndRun(t *testing.T) {
 }
 
 func TestBuild_WiresQueueAndRunner(t *testing.T) {
-	defer appkit.StopCallExecutor()
+	defer backend.StopCallExecutor()
 
 	dbPath := filepath.Join(t.TempDir(), "build_test.db")
 	openFn := func(string) (storage.Conn, error) {
@@ -375,7 +375,7 @@ func TestBuild_WiresQueueAndRunner(t *testing.T) {
 	store := newMemTestStore()
 	testMod := &testExternalCallModule{store: store, calls: make(map[string]int)}
 
-	app, b, s := kit(part("external", func(d appkit.Deps) (model.ModuleNaming, error) {
+	app, b, s := kit(part("external", func(d backend.Deps) (model.ModuleNaming, error) {
 		if d.Queue == nil {
 			t.Errorf("expected d.Queue to be non-nil in Deps")
 		}
@@ -384,7 +384,7 @@ func TestBuild_WiresQueueAndRunner(t *testing.T) {
 	app.TenantID = "tenant-test"
 	s.Database = openFn
 
-	built, err := appkit.Build(app, b, s, dbPath, ddl.Schema{})
+	built, err := backend.Build(app, b, s, dbPath, ddl.Schema{})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestBuild_WiresQueueAndRunner(t *testing.T) {
 }
 
 func TestCallExecutor_RecoversExpiredReplies(t *testing.T) {
-	defer appkit.StopCallExecutor()
+	defer backend.StopCallExecutor()
 	db, ids, _ := setupTestDB(t)
 
 	policy, _ := backoff.New(time.Second, 10*time.Second)
@@ -406,7 +406,7 @@ func TestCallExecutor_RecoversExpiredReplies(t *testing.T) {
 
 	store := newMemTestStore()
 	mod := &testExternalCallModule{store: store, calls: make(map[string]int)}
-	runner := appkit.NewCallRunner([]crud.Module{mod})
+	runner := backend.NewCallRunner([]crud.Module{mod})
 
 	// Add an expired WaitForReply call manually
 	past := time.NowNano() - 100*time.Nano(time.Second)
@@ -428,7 +428,7 @@ func TestCallExecutor_RecoversExpiredReplies(t *testing.T) {
 	}
 
 	// Start executor which triggers runDueCalls and recovers expired replies
-	stop := appkit.StartCallExecutor(q, runner, db, 50*time.Millisecond, nil)
+	stop := backend.StartCallExecutor(q, runner, db, 50*time.Millisecond, nil)
 	defer stop()
 
 	time.AfterFunc(100, func() {}) // small tick

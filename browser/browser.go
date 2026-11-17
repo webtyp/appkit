@@ -1,10 +1,9 @@
-//go:build browser
-
-package appkit
+package browser
 
 import (
 	"errors"
 
+	"webtyp.com/appkit"
 	"webtyp.com/fmt"
 	"webtyp.com/model"
 	"webtyp.com/router"
@@ -21,24 +20,24 @@ var (
 
 // Browser is what runs in the browser: how it talks to the server, how it makes ids and each module's screens.
 //
-//	var Browser = appkit.Browser{Caller: rpc.NewCaller(""), NewIDs: newIDs, Modules: []appkit.BrowserModule{{Name: catalog.Definition.Name, Screens: catalogui.Screens}}}
+//	var Browser = browser.Browser{Caller: rpc.NewCaller(""), NewIDs: newIDs, Modules: []browser.Module{{Name: catalog.Definition.Name, Screens: catalogui.Screens}}}
 type Browser struct {
 	Caller  router.Caller                     // how the browser talks to the server
 	NewIDs  func() (model.IDGenerator, error) // how ids are created in the browser
-	Modules []BrowserModule                   // the screens of each module of App.Modules, found by Name
+	Modules []Module                          // the screens of each module of App.Modules, found by Name
 }
 
-// BrowserModule is the screens of one module. Name is the module's Definition.Name; Screens nil = a module with no screen.
-type BrowserModule struct {
+// Module is the screens of one module. Name is the module's Definition.Name; Screens nil = a module with no screen.
+type Module struct {
 	Name    string
 	Screens func(d view.BrowserDeps) []view.Screen
 }
 
-// RunBrowser is the whole body of an app's web/browser/main.go: it builds the session and gives it to the layout the
+// Run is the whole body of an app's web/browser/main.go: it builds the session and gives it to the layout the
 // app chose; it never returns.
 //
-//	func main() { appkit.RunBrowser(config.App, config.Browser, layoutapp.New(devtools.Menu())) }
-func RunBrowser(app App, b Browser, layout view.Layout) {
+//	func main() { browser.Run(config.App, screens.Browser, layoutapp.New(devtools.Menu())) }
+func Run(app appkit.App, b Browser, layout view.Layout) {
 	session, err := NewSession(app, b)
 	if err != nil {
 		app.Log("appkit:", err) // App.Log is required (ErrNoLog), so this never panics
@@ -51,8 +50,8 @@ func RunBrowser(app App, b Browser, layout view.Layout) {
 // NewSession builds what a layout draws: the app's name, the connection to the server, the zone, the menu screens and
 // the sign-in screens.
 //
-//	session, err := appkit.NewSession(config.App, config.Browser)
-func NewSession(app App, b Browser) (view.Session, error) {
+//	session, err := browser.NewSession(config.App, screens.Browser)
+func NewSession(app appkit.App, b Browser) (view.Session, error) {
 	d, err := browserDeps(app, b)
 	if err != nil {
 		return view.Session{}, err
@@ -69,7 +68,7 @@ func NewSession(app App, b Browser) (view.Session, error) {
 
 // Screens are the menu's screens: the module administration of the sign-in first when the app has one, then each
 // module's in App.Modules order (the first one opens first).
-func Screens(app App, b Browser, d view.BrowserDeps) []view.Screen {
+func Screens(app appkit.App, b Browser, d view.BrowserDeps) []view.Screen {
 	out := signInMenu(app, d)
 	for _, def := range app.Modules {
 		for _, m := range b.Modules {
@@ -81,9 +80,9 @@ func Screens(app App, b Browser, d view.BrowserDeps) []view.Screen {
 	return out
 }
 
-func browserDeps(app App, b Browser) (view.BrowserDeps, error) {
+func browserDeps(app appkit.App, b Browser) (view.BrowserDeps, error) {
 	if app.Log == nil {
-		return view.BrowserDeps{}, ErrNoLog
+		return view.BrowserDeps{}, appkit.ErrNoLog
 	}
 	if b.Caller == nil {
 		return view.BrowserDeps{}, ErrNoCaller
@@ -119,7 +118,7 @@ func browserDeps(app App, b Browser) (view.BrowserDeps, error) {
 	}
 	zone, err := time.LoadZone(app.Timezone)
 	if err != nil {
-		return view.BrowserDeps{}, ErrNoTimezone
+		return view.BrowserDeps{}, appkit.ErrNoTimezone
 	}
 	return view.BrowserDeps{Caller: b.Caller, Zone: zone, Countries: app.Countries, IDs: ids}, nil
 }

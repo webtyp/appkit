@@ -2,7 +2,7 @@
 
 | Test | Rule |
 |---|---|
-| [TestBrowserBuild_AppkitImportsNoServerCode](../tests/browser_build_test.go) | appkit's browser files import no server code (orm, mcp, rbac, httpd, unixid, rpc, inprocess) |
+| [TestBrowserBuild_AppkitImportsNoServerCode](../tests/browser_build_test.go) | la raíz de `appkit` y `appkit/browser` no importan código de servidor |
 | [TestCallQueueAdapter_AllMethods](../tests/external_calls_test.go) | CallQueueAdapter delegates queue operations to externalcalls.Queue |
 | [TestCallRunner_DeclarationAndRun](../tests/external_calls_test.go) | CallRunner resolves call declarations and executes external calls |
 | [TestBuild_WiresQueueAndRunner](../tests/external_calls_test.go) | Build initializes the call queue and runner for modules with external calls |
@@ -10,9 +10,9 @@
 | [TestFindBuiltModule_ReturnsTheModuleBuiltBefore](../tests/kit_test.go) | FindBuiltModule returns the module built earlier by its name |
 | [TestFindBuiltModule_ProviderAfterConsumerNamesTheMissingOne](../tests/kit_test.go) | asking for a module built later is an error that names it |
 | [TestBuild_ModulesAreBuiltInAppOrder](../tests/kit_test.go) | modules are built in App.Modules order, not in the order of the parts |
-| [TestBuild_ModuleWithoutItsPartIsAnError](../tests/kit_test.go) | a listed module without a BackendModule is ErrNoPart |
-| [TestBuild_PartOfAnUnlistedModuleIsAnError](../tests/kit_test.go) | a BackendModule of a module not in App.Modules is ErrUnlistedPart |
-| [TestBuild_PartWithoutBuildIsAnError](../tests/kit_test.go) | a BackendModule without Build is ErrNoBuildFunc |
+| [TestBuild_ModuleWithoutItsPartIsAnError](../tests/kit_test.go) | a listed module without a backend.Module is ErrNoPart |
+| [TestBuild_PartOfAnUnlistedModuleIsAnError](../tests/kit_test.go) | a backend.Module of a module not in App.Modules is ErrUnlistedPart |
+| [TestBuild_PartWithoutBuildIsAnError](../tests/kit_test.go) | a backend.Module without Build is ErrNoBuildFunc |
 | [TestBuild_ModuleErrorIsNamed](../tests/kit_test.go) | a module's build error carries the module name |
 | [TestBuild_NeitherCrudNorPartsIsAnError](../tests/kit_test.go) | a module that is neither crud.Module nor Parts is ErrNotCrudModule |
 | [TestBuild_PartsAreFoundLikeModules](../tests/kit_test.go) | the parts of a module are found by FindBuiltModule by their name |

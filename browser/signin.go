@@ -1,9 +1,8 @@
-//go:build browser
-
-package appkit
+package browser
 
 import (
 	accessui "webtyp.com/access/ui"
+	"webtyp.com/appkit"
 	"webtyp.com/auth"
 	. "webtyp.com/dom"
 	"webtyp.com/fetch"
@@ -32,7 +31,7 @@ const (
 )
 
 // signInMenu is the administration of users and roles the sign-in brings to the menu; none without sign-in.
-func signInMenu(app App, d view.BrowserDeps) []view.Screen {
+func signInMenu(app appkit.App, d view.BrowserDeps) []view.Screen {
 	if app.SignIn == 0 {
 		return nil
 	}
@@ -40,12 +39,12 @@ func signInMenu(app App, d view.BrowserDeps) []view.Screen {
 }
 
 // signInScreens are the sign-in and first-setup screens of the app's sign-in method; zero when the app has none.
-func signInScreens(app App, d view.BrowserDeps) (view.EntryScreens, error) {
+func signInScreens(app appkit.App, d view.BrowserDeps) (view.EntryScreens, error) {
 	if app.SignIn == 0 {
 		return view.EntryScreens{}, nil
 	}
-	if app.SignIn != SignInByTrustedIP {
-		return view.EntryScreens{}, ErrUnknownSignIn
+	if app.SignIn != appkit.SignInByTrustedIP {
+		return view.EntryScreens{}, appkit.ErrUnknownSignIn
 	}
 	loginMessage := NewString("")
 	loginData := &auth.RUTLoginData{}

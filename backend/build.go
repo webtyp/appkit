@@ -1,8 +1,7 @@
-//go:build !browser
-
-package appkit
+package backend
 
 import (
+	"webtyp.com/appkit"
 	"webtyp.com/backoff"
 	"webtyp.com/crud"
 	"webtyp.com/ddl"
@@ -34,13 +33,13 @@ const (
 // Built is the app built but not yet serving: what the server's HTTP layer needs (Authn, Authorize, Policy) and Mount,
 // which publishes the operations. The main creates the HTTP server in between, because httpd.Config needs those three.
 //
-//	built, err := appkit.Build(config.App, config.Backend, config.Server, dsn, config.Schema)
+//	built, err := backend.Build(config.App, services.Backend, services.Server, dsn, services.Schema)
 type Built struct {
 	Authn     router.Middleware     // who the caller is (session); nil without sign-in
 	Authorize model.Authorizer      // what the caller may do; denies everything without sign-in
 	Policy    model.PolicyDescriber // which role opens each resource (API explorer); nil when unknown
 
-	app     App
+	app     appkit.App
 	backend Backend
 	d       Deps
 	ops     []crud.Module
@@ -52,7 +51,7 @@ type Built struct {
 //
 // With a database it also logs, one line each, the columns schema's models no longer have but that still hold
 // data; it never drops them and never refuses to start. dsn "" = no database: nothing is built and everything is denied.
-func Build(app App, b Backend, s Server, dsn string, schema ddl.Schema) (*Built, error) {
+func Build(app appkit.App, b Backend, s Server, dsn string, schema ddl.Schema) (*Built, error) {
 	if err := check(app, b, s); err != nil {
 		return nil, err
 	}
@@ -62,7 +61,7 @@ func Build(app App, b Backend, s Server, dsn string, schema ddl.Schema) (*Built,
 	}
 	zone, err := time.LoadZone(app.Timezone)
 	if err != nil {
-		return nil, ErrNoTimezone
+		return nil, appkit.ErrNoTimezone
 	}
 	d := Deps{IDs: ids, Events: b.Events, TenantID: app.TenantID, Zone: zone, Countries: app.Countries, Log: app.Log}
 	out := &Built{app: app, backend: b, Authorize: DenyAll(app.Log)}
@@ -117,9 +116,9 @@ func (out *Built) entry(d *Deps, b Backend, s Server, ops *[]crud.Module) error 
 	switch out.app.SignIn {
 	case 0:
 		out.app.Log(msgNoSignIn)
-	case SignInByTrustedIP:
+	case appkit.SignInByTrustedIP:
 	default:
-		return ErrUnknownSignIn
+		return appkit.ErrUnknownSignIn
 	}
 	if out.app.SignIn == 0 && len(grants) == 0 {
 		return nil
@@ -151,10 +150,10 @@ func (out *Built) entry(d *Deps, b Backend, s Server, ops *[]crud.Module) error 
 	return nil
 }
 
-func check(app App, b Backend, s Server) error {
+func check(app appkit.App, b Backend, s Server) error {
 	switch {
 	case app.Log == nil:
-		return ErrNoLog
+		return appkit.ErrNoLog
 	case b.Events == nil:
 		return ErrNoEvents
 	case b.API == nil:
@@ -165,8 +164,8 @@ func check(app App, b Backend, s Server) error {
 	return checkParts(app, b)
 }
 
-// checkParts: every module of App.Modules has exactly one BackendModule, and every BackendModule is in App.Modules.
-func checkParts(app App, b Backend) error {
+// checkParts: every module of App.Modules has exactly one Module, and every Module is in App.Modules.
+func checkParts(app appkit.App, b Backend) error {
 	for _, def := range app.Modules {
 		if _, ok := partOf(b, def.Name); !ok {
 			return fmt.ErrType(fmt.Err(def.Name), ErrNoPart)
@@ -189,18 +188,18 @@ func checkParts(app App, b Backend) error {
 	return nil
 }
 
-func partOf(b Backend, name string) (BackendModule, bool) {
+func partOf(b Backend, name string) (Module, bool) {
 	for _, m := range b.Modules {
 		if m.Name == name {
 			return m, true
 		}
 	}
-	return BackendModule{}, false
+	return Module{}, false
 }
 
 // buildModules builds app.Modules in order on d.DB, appending each to d.built (so later modules find it).
 // It returns the crud modules among them, for Mount.
-func buildModules(app App, b Backend, d *Deps) (ops []crud.Module, err error) {
+func buildModules(app appkit.App, b Backend, d *Deps) (ops []crud.Module, err error) {
 	built := make([]builtModule, 0, len(app.Modules))
 	d.built = &built
 	add := func(name string, v model.ModuleNaming) {
@@ -234,11 +233,11 @@ func buildModules(app App, b Backend, d *Deps) (ops []crud.Module, err error) {
 // BuildModules builds the app's modules, in App.Modules order, all on db. An import passes its transaction,
 // so every write rolls back with it. The sign-in is not built: an import is not a person entering.
 //
-//	plan := dataimport.Plan[appkit.Deps]{
-//		Build: func(tx *orm.DB) (appkit.Deps, error) { return appkit.BuildModules(config.App, config.Backend, config.Server, tx) },
+//	plan := dataimport.Plan[backend.Deps]{
+//		Build: func(tx *orm.DB) (backend.Deps, error) { return backend.BuildModules(config.App, services.Backend, services.Server, tx) },
 //	}
-//	// in a step: m, err := appkit.FindBuiltModule(s.Modules, authority.ModuleName)
-func BuildModules(app App, b Backend, s Server, db *orm.DB) (Deps, error) {
+//	// in a step: m, err := backend.FindBuiltModule(s.Modules, authority.ModuleName)
+func BuildModules(app appkit.App, b Backend, s Server, db *orm.DB) (Deps, error) {
 	if db == nil {
 		return Deps{}, ErrNoDatabase
 	}
@@ -251,7 +250,7 @@ func BuildModules(app App, b Backend, s Server, db *orm.DB) (Deps, error) {
 	}
 	zone, err := time.LoadZone(app.Timezone)
 	if err != nil {
-		return Deps{}, ErrNoTimezone
+		return Deps{}, appkit.ErrNoTimezone
 	}
 	policy, err := backoff.New(time.Second, 60*time.Second)
 	if err != nil {
@@ -271,7 +270,7 @@ func BuildModules(app App, b Backend, s Server, db *orm.DB) (Deps, error) {
 // Mount publishes the built operations on r with the API and the agents the backend chose, then the app's own routes
 // and extra mounts (dev tools), which receive the policy.
 //
-//	err = built.Mount(srv.Router(), devtools.Server(config.Schema)...)
+//	err = built.Mount(srv.Router(), devtools.Server(services.Schema)...)
 func (out *Built) Mount(r router.Router, mounts ...func(r router.Router, policy model.PolicyDescriber) error) error {
 	b := out.backend
 	if err := b.API.MountOperations(r, out.ops, b.Public, out.d.Events, out.app.Log); err != nil {

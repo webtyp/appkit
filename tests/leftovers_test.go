@@ -1,4 +1,4 @@
-//go:build !wasm && !browser
+//go:build !wasm
 
 package tests
 
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/appkit/backend"
 	"webtyp.com/ddl"
 	"webtyp.com/model"
 	"webtyp.com/sqlite"
@@ -56,7 +57,7 @@ func holidayDSN(t *testing.T) string {
 }
 
 // logLines builds an app whose log is kept, one string per call.
-func logLines(open func(string) (storage.Conn, error)) (appkit.App, appkit.Backend, appkit.Server, *[]string) {
+func logLines(open func(string) (storage.Conn, error)) (appkit.App, backend.Backend, backend.Server, *[]string) {
 	var lines []string
 	app, b, srv := kit()
 	app.Log = func(a ...any) { lines = append(lines, fmt.Sprintln(a...)) }
@@ -67,7 +68,7 @@ func logLines(open func(string) (storage.Conn, error)) (appkit.App, appkit.Backe
 func TestLeftovers_ServerWarnsAtStart(t *testing.T) {
 	dsn := holidayDSN(t)
 	app, b, s, lines := logLines(sqlite.Open)
-	if _, err := appkit.Build(app, b, s, dsn, holidaySchema); err != nil {
+	if _, err := backend.Build(app, b, s, dsn, holidaySchema); err != nil {
 		t.Fatal(err)
 	}
 	got := linesWith(*lines, "holiday.label")
@@ -88,7 +89,7 @@ func TestLeftovers_ServerWarnsAtStart(t *testing.T) {
 
 func TestLeftovers_ServerStartsWhenUncheckable(t *testing.T) {
 	app, b, s, lines := logLines(openMem)
-	if _, err := appkit.Build(app, b, s, "mem", holidaySchema); err != nil {
+	if _, err := backend.Build(app, b, s, "mem", holidaySchema); err != nil {
 		t.Fatalf("a database that cannot be checked must not stop the server, got %v", err)
 	}
 	if len(linesWith(*lines, "leftover columns not checked")) != 1 {
@@ -98,7 +99,7 @@ func TestLeftovers_ServerStartsWhenUncheckable(t *testing.T) {
 
 func TestLeftovers_NoSchemaNoCheck(t *testing.T) {
 	app, b, s, lines := logLines(openMem)
-	if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); err != nil {
+	if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := linesWith(*lines, "leftover"); len(got) != 0 {
