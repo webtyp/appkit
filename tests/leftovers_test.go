@@ -1,4 +1,4 @@
-//go:build !wasm
+//go:build !wasm && !browser
 
 package tests
 
@@ -56,29 +56,18 @@ func holidayDSN(t *testing.T) string {
 }
 
 // logLines builds an app whose log is kept, one string per call.
-func logLines(open func(string) (storage.Conn, error)) (appkit.App, *[]string) {
+func logLines(open func(string) (storage.Conn, error)) (appkit.App, appkit.Backend, appkit.Server, *[]string) {
 	var lines []string
-	return appkit.App{
-		Timezone: "America/Santiago",
-		Server:   appkit.AppServer{Database: open},
-		Log:      func(a ...any) { lines = append(lines, fmt.Sprintln(a...)) },
-	}, &lines
-}
-
-func linesWith(lines []string, part string) []string {
-	var out []string
-	for _, l := range lines {
-		if strings.Contains(l, part) {
-			out = append(out, l)
-		}
-	}
-	return out
+	app, b, srv := kit()
+	app.Log = func(a ...any) { lines = append(lines, fmt.Sprintln(a...)) }
+	srv.Database = open
+	return app, b, srv, &lines
 }
 
 func TestLeftovers_ServerWarnsAtStart(t *testing.T) {
 	dsn := holidayDSN(t)
-	app, lines := logLines(sqlite.Open)
-	if _, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: dsn}, holidaySchema); err != nil {
+	app, b, s, lines := logLines(sqlite.Open)
+	if _, err := appkit.Build(app, b, s, dsn, holidaySchema); err != nil {
 		t.Fatal(err)
 	}
 	got := linesWith(*lines, "holiday.label")
@@ -98,8 +87,8 @@ func TestLeftovers_ServerWarnsAtStart(t *testing.T) {
 }
 
 func TestLeftovers_ServerStartsWhenUncheckable(t *testing.T) {
-	app, lines := logLines(openMem)
-	if _, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, holidaySchema); err != nil {
+	app, b, s, lines := logLines(openMem)
+	if _, err := appkit.Build(app, b, s, "mem", holidaySchema); err != nil {
 		t.Fatalf("a database that cannot be checked must not stop the server, got %v", err)
 	}
 	if len(linesWith(*lines, "leftover columns not checked")) != 1 {
@@ -108,8 +97,8 @@ func TestLeftovers_ServerStartsWhenUncheckable(t *testing.T) {
 }
 
 func TestLeftovers_NoSchemaNoCheck(t *testing.T) {
-	app, lines := logLines(openMem)
-	if _, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: "mem"}, ddl.Schema{}); err != nil {
+	app, b, s, lines := logLines(openMem)
+	if _, err := appkit.Build(app, b, s, "mem", ddl.Schema{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := linesWith(*lines, "leftover"); len(got) != 0 {

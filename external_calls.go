@@ -167,7 +167,7 @@ func (ci *callInspector) AddReadOnlyEntity(m model.ModuleNaming, newFilter func(
 
 type inertRoute struct{}
 
-func (inertRoute) RequiresMFA() crud.Route     { return inertRoute{} }
+func (inertRoute) RequiresMFA() crud.Route         { return inertRoute{} }
 func (inertRoute) Describe(text string) crud.Route { return inertRoute{} }
 
 func hasExternalCalls(ops []crud.Module) bool {
@@ -188,6 +188,7 @@ func hasExternalCalls(ops []crud.Module) bool {
 // It returns a function to cancel the background execution.
 //
 // Example: stop := appkit.StartCallExecutor(queue, runner, db, 5*time.Second, logger)
+//
 //	defer stop()
 func StartCallExecutor(q *externalcalls.Queue, r externalcalls.Runner, db *orm.DB, interval time.Duration, logger func(...any)) func() {
 	var stopped bool

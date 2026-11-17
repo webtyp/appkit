@@ -1,130 +1,105 @@
 # appkit
 <img src="docs/img/badges.svg">
 
-The application kit: one value turns WebTyp pieces (server, permissions, session, menu) into a ready app, for both binaries.
+The application kit: the app hands it what it chose (database, ids, broker, transports) and the list of its modules; it builds the app — modules in order, sign-in, operations, browser session — and picks no concrete itself.
 
 ## Why This Exists
 
-Without appkit, each app writes its server wiring, its login wiring (users, roles, first administrator, rate limit),
-its browser session, and lists every module twice — once for the server, once for the menu.
-With appkit, the app declares one [`App`](app.go); each module is one [`Module`](app.go) value; `web/server/main.go`
-and `web/browser/main.go` are generated (migrations live in `webtyp.com/migrate`, dev tools in `webtyp.com/devtools`).
+Without appkit, each app writes its module wiring, its login wiring (users, roles, first administrator, rate limit)
+and its browser session, and lists every module twice — once for the server, once for the menu.
+With appkit, the app declares `App` (what it is, its modules once), `Backend` (how each module is built, the transports),
+`Server` (what only the native server decides) and `Browser` (each module's screens); the `main` of each binary is one call.
 
 | Without | With |
 |---|---|
-| `config/server.go`, `config/auth.go`, `config/client.go` | One `appkit.App` |
-| Every module listed for the server and again for the menu | `App.Modules`, once |
-| Dev tools mounted by hand | Passed to `Server` and `Browser` |
-| Adapters written by hand between modules | [`Find`](module_server.go) by interface |
+| `config/server.go`, `config/auth.go`, `config/client.go` | `App` + `Backend` + `Server` + `Browser` |
+| Every module listed for the server and again for the menu | `App.Modules`, once, in build order |
+| Login wiring written by hand | `App.SignIn: appkit.SignInByTrustedIP` |
+| Adapters written by hand between modules | the module that provides exports a plain type; the app joins them with `FindBuiltModule` |
 
 ## Before You Start
 
-- **Isomorphic separation**: [`app_server.go`](app_server.go), [`module_server.go`](module_server.go), and [`server.go`](server.go) are tagged `//go:build !browser` (`serve.go` is `!wasm`). In browser WASM, empty struct stand-ins ([`app_server_browser.go`](app_server_browser.go), [`module_server_browser.go`](module_server_browser.go)) keep types defined without compiling server dependencies.
-- Modules are built and shown in `App.Modules` order. The entry module (`webtyp.com/access/module`) goes first:
-  appkit finds it among the built modules via `Find[Entry]`.
-- The first screen of the list is the one opened first.
-- appkit never imports a database driver: the app passes it in `AppServer.Database`.
+- **Only the app imports `appkit`.** Modules and `access` never do. `appkit` imports no database driver, HTTP server, transport, id generator or broker: the app passes them in.
+- Platform axes: `App` has no tag (server, Worker and browser read it); `Backend`, `Server` build files are `!browser`; `Browser`, `RunBrowser` and the sign-in screens are `browser`.
+- Modules are built, migrated and shown in `App.Modules` order; whoever provides to another goes first. The first screen is the one opened first.
+- A listed module without its `BackendModule` (or `BrowserModule`) is an error at start that names it; so is a part whose module is not listed.
 
 ## Step-by-Step Guide
 
-1. A module exports one value from its `module/` package:
+1. **What the app is** — `config/app.go` (no tag):
 
 ```go
-// module/module.go (no tag)
-var Module = appkit.Module{Name: "service_catalog", Server: server, Browser: browser}
-
-// module/server.go (//go:build !browser)
-var server = appkit.ModuleServer{Build: build}
-var browser view.ModuleBrowser
-
-func build(d appkit.Deps) (model.ModuleNaming, error) {
-	return servicecatalog.New(d.DB, servicecatalog.Deps{IDs: d.IDs, Publisher: d.Events, TenantID: d.TenantID})
-}
-
-// module/browser.go (//go:build browser)
-var server appkit.ModuleServer
-var browser = view.ModuleBrowser{Screens: ui.Screens}
-```
-
-2. The app declares itself with [`view.Brand`](https://github.com/webtyp/view):
-
-```go
-// config/app.go (no tag)
 var App = appkit.App{
-	TenantID: "acme",
-	Timezone: "America/Santiago",
-	Brand:    view.Brand{Name: "Acme", LogoMark: "logo.svg"},
-	Modules:  []appkit.Module{access.Module, catalog.Module},
-	Server:   server,
-	Log:      fmt.Println,
+	Name: "Acme", TenantID: "acme", Timezone: "America/Santiago",
+	Countries: country.Catalog{ /* the default country and which go first */ },
+	SignIn:    appkit.SignInByTrustedIP, // without it nobody enters and every operation is denied
+	Modules:   []model.ModuleDefinition{catalog.Definition, devices.Definition, staff.Definition},
+	Log:       log.Println, // required (ErrNoLog)
 }
+```
 
-// config/server.go (//go:build !browser)
-var server = appkit.AppServer{
-	Database: postgres.Open,
-	Infra:    []appkit.Infra{access.Infra},
-	Public: []crud.Public{
-		{Model: &catalog.Category{}, Actions: model.Read},
-		{Model: &contact.Message{}, Actions: model.Create},
+2. **The backend** — `config/backend.go` (`!browser`: server and Worker):
+
+```go
+var Backend = appkit.Backend{
+	Events: &inprocess.Broker{}, API: rpc.JSON{}, Agents: mcp.Tools{Allowed: MCPTools()},
+	Modules: []appkit.BackendModule{
+		{Name: catalog.Definition.Name, Build: func(d appkit.Deps) (model.ModuleNaming, error) {
+			return catalog.New(d.DB, catalog.Deps{IDs: d.IDs, Publisher: d.Events, TenantID: d.TenantID})
+		}},
+		{Name: staff.Definition.Name, Build: buildStaff}, // asks device_manager for its devices with appkit.FindBuiltModule
 	},
-	Grants: rbacService,
-}
-
-// config/browser.go (//go:build browser)
-var server appkit.AppServer
-```
-
-`Log` is **required** (`log.Println`): the server writes its warnings there and refuses to start without it (`ErrNoLog`).
-`Timezone` is **required**: an IANA name (`America/Santiago`) loaded once for both `Deps.Zone` and `view.BrowserDeps.Zone` (`ErrNoTimezone`).
-
-### Server Events and Transports
-
-`BuildServer` initializes `Deps.Events`: the broker writes announce on (`crud` publishes after each commit). `MountServer` passes `ServerConfig.Events` to `rpc.Mount` and `mcp.HarvestOps` so every write arriving by HTTP or by an agent announces itself:
-
-```go
-cfg := appkit.ServerConfig{
-	Name:       app.TenantID,
-	Operations: ops,
-	Events:     d.Events, // broker writes announce on
-	Public:     app.Server.Public,
 }
 ```
 
-What any signed-in person may do is declared in `ModuleServer.DefaultGrants`, merged at boot and ensured via `AppServer.Grants`.
-
-### External Calls Orchestration and Migration
-
-When entities declare `ExternalCalls` (`model.ExternalCallDefinition`), `BuildServer` initializes the durable queue (`webtyp.com/externalcalls` with `webtyp.com/backoff`), adapts it to `crud.CallQueue`, populates `Deps.Queue`, and sets `crud.SetDefaultQueue`.
-When modules declare external calls, `BuildServer` starts the periodic executor (`RunPendingCalls` with 50 calls limit) and handles crash recovery for expired `WaitForReply` calls.
-
-**Database migration:** External calls require the `queued_call` table. Add `externalcallsmigrate.Migrate(conn, compiler)` from `webtyp.com/externalcalls/migrate` to the database migration steps (`cmd/migrate/main.go`).
-
-3. The generated mains:
+3. **The native server** — `config/server.go` (`!wasm`; a Worker adds `config/edge.go`):
 
 ```go
-// web/server/main.go
-func main() { if err := appkit.Server(config.App, config.Schema, devtools.Server(config.Schema)...); err != nil { log.Fatal(err) } }
+var Server = appkit.Server{Database: postgres.Open, NewIDs: func() (model.IDGenerator, error) { return unixid.NewUnixID() }}
+```
 
+4. **The browser** — `config/browser.go` (`browser`):
+
+```go
+var Browser = appkit.Browser{
+	Caller: rpc.NewCaller(""), NewIDs: func() (model.IDGenerator, error) { return unixid.NewUnixID() },
+	Modules: []appkit.BrowserModule{{Name: catalog.Definition.Name, Screens: catalogui.Screens}}, // Screens(d view.BrowserDeps)
+}
+```
+
+5. **The mains** (generated by `webtyp.com/server`):
+
+```go
 // web/browser/main.go
-func main() { appkit.Browser(config.App, layoutapp.New(devtools.Menu())) }
+func main() { appkit.RunBrowser(config.App, config.Browser, layoutapp.New(devtools.Menu())) }
+
+// web/server/main.go — the HTTP server is created between Build and Mount because httpd.Config needs the three values Build returns
+built, err := appkit.Build(config.App, config.Backend, config.Server, dsn, config.Schema)
+srv := httpd.New(httpd.Config{ /* … */ Authn: built.Authn, Authorize: built.Authorize, Policy: built.Policy})
+err = built.Mount(srv.Router(), devtools.Server(config.Schema)...)
 ```
 
-`appkit.Browser(config.App, layout)` compiles `view.Session` through `appkit.NewSession` and hands it to `view.Layout`.
+`Log` and `Timezone` are **required** (`ErrNoLog`, `ErrNoTimezone`). `Build` also logs, one line each, the columns the models no longer have but that hold data; it never drops them.
+
+### Default grants and external calls
+
+What any signed-in person may do with a module is `BackendModule.DefaultGrants`, ensured at boot on `rbac.RoleAuthenticated` with the rbac that `appkit` builds itself.
+When entities declare `ExternalCalls`, `Build` creates the durable queue (`webtyp.com/externalcalls`), fills `Deps.Queue`, sets `crud.SetDefaultQueue` and starts the periodic executor. They need the `queued_call` table: add `externalcallsmigrate.Migrate` from `webtyp.com/externalcalls/migrate` to the migration steps.
+
+### Importing history
+
+`appkit.BuildModules(config.App, config.Backend, config.Server, tx)` builds the modules on a transaction (the sign-in is not built): an import finds them with `FindBuiltModule` and every write rolls back with it.
 
 ## Documentation Map
-
-`appkit` never imports `webtyp.com/layout`.
 
 | File | What |
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design and decisions |
-| [`docs/TESTS.md`](docs/TESTS.md) | Test suite inventory and coverage |
-| [`app.go`](app.go) | `App`, `Module` |
-| [`session.go`](session.go) | `NewSession` (`view.Session`) |
-| [`browser.go`](browser.go) | `Browser` (`view.Layout`) |
-| [`module_server.go`](module_server.go) | `ModuleServer`, `Deps`, `Find`, `Entry`, `Parts` |
-| [`screens.go`](screens.go) | `Screens`, `EntryScreens` |
+| [`docs/TESTS.md`](docs/TESTS.md) | Test suite inventory |
+| [`app.go`](app.go) | `App`, `SignInMethod` |
+| [`backend.go`](backend.go) | `Backend`, `BackendModule`, `Server`, `API`, `Agents`, `Deps`, `FindBuiltModule` |
+| [`build.go`](build.go) | `Build`, `Built.Mount`, `BuildModules` |
+| [`signin_server.go`](signin_server.go) / [`signin_browser.go`](signin_browser.go) | The sign-in by trusted IP, server and screens |
+| [`browser.go`](browser.go) | `Browser`, `BrowserModule`, `RunBrowser`, `NewSession` |
 | [`external_calls.go`](external_calls.go) | `NewCallQueue`, `NewCallRunner`, `StartCallExecutor` |
-| [`brand.go`](brand.go) / [`brand_ssr.go`](brand_ssr.go) | Access screen copy and SSR pre-rendering |
-| [`env.go`](env.go) / [`serve.go`](serve.go) | Server environment, server build (`Server`, `BuildServer`) |
-| [`server.go`](server.go) | `MountServer`: rpc, MCP, `Mounts` |
+| [`render_ssr.go`](render_ssr.go) | `App.RenderHTML`: the loading card before the wasm downloads |

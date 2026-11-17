@@ -1,4 +1,4 @@
-//go:build !wasm
+//go:build !wasm && !browser
 
 package tests
 
@@ -59,7 +59,10 @@ func (r *testCallRec) DecodeFields(rd model.FieldReader) {
 
 type testCallRecList []testCallRec
 
-func (l *testCallRecList) Append() model.Fielder  { *l = append(*l, testCallRec{}); return &(*l)[len(*l)-1] }
+func (l *testCallRecList) Append() model.Fielder {
+	*l = append(*l, testCallRec{})
+	return &(*l)[len(*l)-1]
+}
 func (l *testCallRecList) Len() int               { return len(*l) }
 func (l *testCallRecList) At(i int) model.Fielder { return &(*l)[i] }
 func (l *testCallRecList) EncodeFields(w model.FieldWriter) {
@@ -354,10 +357,10 @@ func TestCallRunner_DeclarationAndRun(t *testing.T) {
 	}
 }
 
-func TestBuildServer_WiresQueueAndRunner(t *testing.T) {
+func TestBuild_WiresQueueAndRunner(t *testing.T) {
 	defer appkit.StopCallExecutor()
 
-	dbPath := filepath.Join(t.TempDir(), "buildserver_test.db")
+	dbPath := filepath.Join(t.TempDir(), "build_test.db")
 	openFn := func(string) (storage.Conn, error) {
 		conn, err := sqlite.Open(dbPath)
 		if err != nil {
@@ -372,34 +375,21 @@ func TestBuildServer_WiresQueueAndRunner(t *testing.T) {
 	store := newMemTestStore()
 	testMod := &testExternalCallModule{store: store, calls: make(map[string]int)}
 
-	app := appkit.App{
-		TenantID: "tenant-test",
-		Timezone: "America/Santiago",
-		Log:      func(...any) {},
-		Server: appkit.AppServer{
-			Database: openFn,
-		},
-		Modules: []appkit.Module{
-			{
-				Name: "test_module",
-				Server: appkit.ModuleServer{
-					Build: func(d appkit.Deps) (model.ModuleNaming, error) {
-						if d.Queue == nil {
-							t.Errorf("expected d.Queue to be non-nil in Deps")
-						}
-						return testMod, nil
-					},
-				},
-			},
-		},
-	}
+	app, b, s := kit(part("external", func(d appkit.Deps) (model.ModuleNaming, error) {
+		if d.Queue == nil {
+			t.Errorf("expected d.Queue to be non-nil in Deps")
+		}
+		return testMod, nil
+	}))
+	app.TenantID = "tenant-test"
+	s.Database = openFn
 
-	srv, err := appkit.BuildServer(app, appkit.ServerEnv{DSN: dbPath}, ddl.Schema{})
+	built, err := appkit.Build(app, b, s, dbPath, ddl.Schema{})
 	if err != nil {
-		t.Fatalf("BuildServer: %v", err)
+		t.Fatalf("Build: %v", err)
 	}
-	if srv == nil {
-		t.Fatalf("expected non-nil server")
+	if built == nil {
+		t.Fatalf("expected non-nil Built")
 	}
 
 	if crud.DefaultQueue() == nil {

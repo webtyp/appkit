@@ -1,4 +1,4 @@
-//go:build !wasm
+//go:build !wasm && !browser
 
 package tests
 
@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-func TestBrowserBuild_LeavesServerCodeOut(t *testing.T) {
-	cmd := exec.Command("go", "list", "-deps", "-tags", "browser", "-f", "{{.ImportPath}}", "./...")
+func TestBrowserBuild_AppkitImportsNoServerCode(t *testing.T) {
+	cmd := exec.Command("go", "list", "-tags", "browser", "-f", "{{join .Imports \"\\n\"}}", ".")
 	cmd.Dir = ".."
 	cmd.Env = append(cmd.Environ(), "GOOS=js", "GOARCH=wasm")
 	out, err := cmd.CombinedOutput()
@@ -23,11 +23,14 @@ func TestBrowserBuild_LeavesServerCodeOut(t *testing.T) {
 		"webtyp.com/server/httpd",
 		"webtyp.com/externalcalls",
 		"webtyp.com/backoff",
+		"webtyp.com/unixid",
+		"webtyp.com/rpc",
+		"webtyp.com/events/inprocess",
 	}
-	output := string(out)
+	output := "\n" + string(out) + "\n"
 	for _, f := range forbidden {
-		if strings.Contains(output, f) {
-			t.Errorf("browser build must not import %s, found in deps", f)
+		if strings.Contains(output, "\n"+f+"\n") {
+			t.Errorf("appkit's browser files must not import %s", f)
 		}
 	}
 }

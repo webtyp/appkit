@@ -1,4 +1,4 @@
-//go:build !wasm
+//go:build !wasm && !browser
 
 package tests
 
@@ -77,8 +77,8 @@ func (l *tableModelList) Append() model.Fielder {
 }
 
 func (l *tableModelList) At(i int) model.Fielder { return (*l)[i] }
-func (l *tableModelList) Len() int             { return len(*l) }
-func (l *tableModelList) IsNil() bool          { return l == nil }
+func (l *tableModelList) Len() int               { return len(*l) }
+func (l *tableModelList) IsNil() bool            { return l == nil }
 
 func (l *tableModelList) EncodeFields(w model.FieldWriter) {
 	a := w.Array("records", len(*l))

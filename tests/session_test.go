@@ -1,170 +1,140 @@
+//go:build browser
+
 package tests
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"webtyp.com/appkit"
+	"webtyp.com/model"
 	"webtyp.com/router"
+	"webtyp.com/unixid"
 	"webtyp.com/view"
 )
 
-type recordingLayout struct {
-	got view.Session
+type noCaller struct{}
+
+func (noCaller) Call(router.Operation, model.Encodable, model.Decodable, func(error)) {}
+func (noCaller) Dispatch(router.Operation, model.Encodable)                           {}
+
+type recordingLayout struct{ got view.Session }
+
+func (l *recordingLayout) Show(s view.Session) { l.got = s }
+
+func browserKit(mods ...appkit.BrowserModule) (appkit.App, appkit.Browser) {
+	app := appkit.App{Name: "acme", Timezone: "America/Santiago", Log: func(...any) {}}
+	for _, m := range mods {
+		app.Modules = append(app.Modules, model.ModuleDefinition{Name: m.Name})
+	}
+	return app, appkit.Browser{
+		Caller:  noCaller{},
+		NewIDs:  func() (model.IDGenerator, error) { return unixid.NewUnixID() },
+		Modules: mods,
+	}
 }
 
-func (l *recordingLayout) Show(s view.Session) {
-	l.got = s
+func screensOf(ids ...string) func(view.BrowserDeps) []view.Screen {
+	return func(view.BrowserDeps) []view.Screen {
+		var out []view.Screen
+		for _, id := range ids {
+			out = append(out, view.Screen{ID: id})
+		}
+		return out
+	}
 }
 
 func TestNewSession_CarriesWhatTheAppIs(t *testing.T) {
-	var logged []any
-	l := func(args ...any) { logged = append(logged, args...) }
-
-	modScreens := appkit.Module{
-		Name: "screens_mod",
-		Browser: view.ModuleBrowser{
-			Screens: func(d view.BrowserDeps) []view.Screen {
-				return []view.Screen{{ID: "s1"}, {ID: "s2"}}
-			},
-		},
-	}
-	modEntry := appkit.Module{
-		Name: "entry_mod",
-		Browser: view.ModuleBrowser{
-			Entry: func(d view.BrowserDeps) view.EntryScreens {
-				return view.EntryScreens{IdleSeconds: 120}
-			},
-		},
-	}
-
-	app := appkit.App{
-		Timezone: "America/Santiago",
-		Brand:    view.Brand{Name: "acme", LogoMark: "logo.svg"},
-		Log:      l,
-		Modules:  []appkit.Module{modScreens, modEntry},
-	}
-
-	session, err := appkit.NewSession(app, dummyCaller{})
+	app, b := browserKit(appkit.BrowserModule{Name: "a", Screens: screensOf("a1")}, appkit.BrowserModule{Name: "b", Screens: screensOf("b1", "b2")})
+	s, err := appkit.NewSession(app, b)
 	if err != nil {
-		t.Fatalf("NewSession: %v", err)
+		t.Fatal(err)
 	}
-
-	if session.Brand.Name != "acme" || session.Brand.LogoMark != "logo.svg" {
-		t.Errorf("unexpected Brand: %+v", session.Brand)
+	if s.Name != "acme" || s.Zone.Name() != "America/Santiago" || s.Log == nil || s.Caller == nil {
+		t.Fatalf("session incomplete: %+v", s)
 	}
-	if session.Zone.Name() != "America/Santiago" {
-		t.Errorf("unexpected Zone: %v", session.Zone.Name())
+	var ids []string
+	for _, sc := range s.Screens {
+		ids = append(ids, sc.ID)
 	}
-	if len(session.Screens) != 2 || session.Screens[0].ID != "s1" || session.Screens[1].ID != "s2" {
-		t.Errorf("unexpected Screens: %+v", session.Screens)
-	}
-	if session.Entry.IdleSeconds != 120 {
-		t.Errorf("unexpected Entry: %+v", session.Entry)
-	}
-	if session.Log == nil {
-		t.Fatal("expected session.Log to be set")
-	}
-	session.Log("test")
-	if len(logged) == 0 {
-		t.Fatal("session.Log did not call app.Log")
+	if strings.Join(ids, ",") != "a1,b1,b2" {
+		t.Fatalf("screens must follow App.Modules order, got %v", ids)
 	}
 }
 
-func TestNewSession_NoTimezoneIsAnError(t *testing.T) {
-	app := appkit.App{}
-	_, err := appkit.NewSession(app, dummyCaller{})
-	if !errors.Is(err, appkit.ErrNoTimezone) {
-		t.Fatalf("expected ErrNoTimezone, got %v", err)
+func TestNewSession_ScreensGetZoneIdsAndCountries(t *testing.T) {
+	var got view.BrowserDeps
+	app, b := browserKit(appkit.BrowserModule{Name: "a", Screens: func(d view.BrowserDeps) []view.Screen { got = d; return nil }})
+	if _, err := appkit.NewSession(app, b); err != nil {
+		t.Fatal(err)
+	}
+	if got.Zone.Name() != "America/Santiago" || got.IDs == nil || got.Caller == nil {
+		t.Fatalf("BrowserDeps incomplete: %+v", got)
 	}
 }
 
 func TestNewSession_ScreensShareOnePageOfRecords(t *testing.T) {
-	var caller1, caller2 router.Caller
-	mod1 := appkit.Module{
-		Name: "mod1",
-		Browser: view.ModuleBrowser{
-			Screens: func(d view.BrowserDeps) []view.Screen {
-				caller1 = d.Caller
-				return []view.Screen{{ID: "s1"}}
-			},
-		},
+	var callers []router.Caller
+	grab := func(d view.BrowserDeps) []view.Screen { callers = append(callers, d.Caller); return nil }
+	app, b := browserKit(appkit.BrowserModule{Name: "a", Screens: grab}, appkit.BrowserModule{Name: "b", Screens: grab})
+	if _, err := appkit.NewSession(app, b); err != nil {
+		t.Fatal(err)
 	}
-	mod2 := appkit.Module{
-		Name: "mod2",
-		Browser: view.ModuleBrowser{
-			Screens: func(d view.BrowserDeps) []view.Screen {
-				caller2 = d.Caller
-				return []view.Screen{{ID: "s2"}}
-			},
-		},
+	if len(callers) != 2 || callers[0] != callers[1] {
+		t.Fatalf("every module must get the same records caller, got %v", callers)
 	}
-	app := appkit.App{
-		Timezone: "America/Santiago",
-		Modules:  []appkit.Module{mod1, mod2},
-	}
+}
 
-	_, err := appkit.NewSession(app, dummyCaller{})
+func TestNewSession_WhatTheAppForgotIsNamed(t *testing.T) {
+	cases := []struct {
+		name   string
+		change func(*appkit.App, *appkit.Browser)
+		want   error
+	}{
+		{"no log", func(a *appkit.App, _ *appkit.Browser) { a.Log = nil }, appkit.ErrNoLog},
+		{"no caller", func(_ *appkit.App, b *appkit.Browser) { b.Caller = nil }, appkit.ErrNoCaller},
+		{"no ids", func(_ *appkit.App, b *appkit.Browser) { b.NewIDs = nil }, appkit.ErrNoBrowserIDs},
+		{"bad timezone", func(a *appkit.App, _ *appkit.Browser) { a.Timezone = "Mars/Base" }, appkit.ErrNoTimezone},
+		{"module without screens part", func(a *appkit.App, _ *appkit.Browser) {
+			a.Modules = append(a.Modules, model.ModuleDefinition{Name: "orphan"})
+		}, appkit.ErrNoBrowserPart},
+		{"screens of an unlisted module", func(_ *appkit.App, b *appkit.Browser) {
+			b.Modules = append(b.Modules, appkit.BrowserModule{Name: "stray"})
+		}, appkit.ErrUnlistedScreens},
+		{"unknown sign-in", func(a *appkit.App, _ *appkit.Browser) { a.SignIn = 99 }, appkit.ErrUnknownSignIn},
+	}
+	for _, c := range cases {
+		app, b := browserKit(appkit.BrowserModule{Name: "a"})
+		c.change(&app, &b)
+		if _, err := appkit.NewSession(app, b); !errors.Is(err, c.want) {
+			t.Errorf("%s: want %v, got %v", c.name, c.want, err)
+		}
+	}
+}
+
+func TestNewSession_WithoutSignInThereAreNoEntryScreens(t *testing.T) {
+	app, b := browserKit(appkit.BrowserModule{Name: "a", Screens: screensOf("a1")})
+	s, err := appkit.NewSession(app, b)
 	if err != nil {
-		t.Fatalf("NewSession: %v", err)
+		t.Fatal(err)
 	}
-
-	if caller1 == nil || caller2 == nil {
-		t.Fatalf("expected callers to be captured")
-	}
-	if caller1 != caller2 {
-		t.Fatalf("screens must share the same records caller instance, got %p vs %p", caller1, caller2)
+	if s.Entry.Login.Form != nil || s.Entry.Setup.Form != nil || len(s.Screens) != 1 {
+		t.Fatalf("no sign-in: no entry screens and no administration screens, got %+v", s)
 	}
 }
 
-func TestNewSession_TwoEntryModulesIsAnError(t *testing.T) {
-	mod1 := appkit.Module{
-		Name: "entry1",
-		Browser: view.ModuleBrowser{
-			Entry: func(d view.BrowserDeps) view.EntryScreens {
-				return view.EntryScreens{IdleSeconds: 60}
-			},
-		},
-	}
-	mod2 := appkit.Module{
-		Name: "entry2",
-		Browser: view.ModuleBrowser{
-			Entry: func(d view.BrowserDeps) view.EntryScreens {
-				return view.EntryScreens{IdleSeconds: 30}
-			},
-		},
-	}
-	app := appkit.App{
-		Timezone: "America/Santiago",
-		Modules:  []appkit.Module{mod1, mod2},
-	}
-
-	_, err := appkit.NewSession(app, dummyCaller{})
-	if !errors.Is(err, appkit.ErrTwoEntryModules) {
-		t.Fatalf("expected ErrTwoEntryModules, got %v", err)
-	}
-}
-
-func TestLayout_ShowReceivesTheSession(t *testing.T) {
-	app := appkit.App{
-		Timezone: "America/Santiago",
-		Brand:    view.Brand{Name: "my-app"},
-	}
-	session, err := appkit.NewSession(app, dummyCaller{})
+func TestNewSession_SignInByTrustedIPBringsTheEntryAndTheAdministration(t *testing.T) {
+	app, b := browserKit(appkit.BrowserModule{Name: "a", Screens: screensOf("a1")})
+	app.SignIn = appkit.SignInByTrustedIP
+	s, err := appkit.NewSession(app, b)
 	if err != nil {
-		t.Fatalf("NewSession: %v", err)
+		t.Fatal(err)
 	}
-
-	layout := &recordingLayout{}
-	var l view.Layout = layout
-	l.Show(session)
-
-	if layout.got.Brand.Name != "my-app" {
-		t.Fatalf("expected Brand.Name 'my-app', got %q", layout.got.Brand.Name)
+	if s.Entry.Login.Form == nil || s.Entry.Setup.Form == nil || s.Entry.IdleSeconds <= 0 {
+		t.Fatalf("sign-in must give the login and the first-setup screens: %+v", s.Entry)
 	}
-}
-
-func TestApp_BrandIsViewBrand(t *testing.T) {
-	check := func(view.Brand) {}
-	check(appkit.App{}.Brand)
+	if len(s.Screens) < 2 || s.Screens[0].ID != "access" || s.Screens[len(s.Screens)-1].ID != "a1" {
+		t.Fatalf("the administration of users and roles goes first, the app's screens after: %+v", s.Screens)
+	}
 }
