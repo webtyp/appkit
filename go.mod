@@ -8,7 +8,7 @@ require (
 	webtyp.com/backoff v0.2.0
 	webtyp.com/country v0.0.2
 	webtyp.com/crud v0.0.18
-	webtyp.com/ddl v0.0.49
+	webtyp.com/ddl v0.0.59
 	webtyp.com/dom v0.13.29
 	webtyp.com/events v0.1.15
 	webtyp.com/externalcalls v0.2.0
