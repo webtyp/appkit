@@ -13,7 +13,7 @@ require (
 	webtyp.com/events v0.1.15
 	webtyp.com/externalcalls v0.2.0
 	webtyp.com/fmt v1.0.3
-	webtyp.com/lang v0.1.20
+	webtyp.com/lang v0.1.22
 	webtyp.com/mcp v0.3.36
 	webtyp.com/model v0.2.26
 	webtyp.com/msgtype v0.1.2
