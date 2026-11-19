@@ -3,6 +3,7 @@ package backend
 import (
 	"webtyp.com/access"
 	"webtyp.com/appkit"
+	"webtyp.com/auth/authority"
 	"webtyp.com/backoff"
 	"webtyp.com/crud"
 	"webtyp.com/ddl"
@@ -12,6 +13,7 @@ import (
 	"webtyp.com/orm"
 	"webtyp.com/rbac"
 	"webtyp.com/router"
+	"webtyp.com/securityevent"
 	"webtyp.com/storage"
 	"webtyp.com/time"
 )
@@ -36,9 +38,10 @@ const (
 //
 //	built, err := backend.Build(config.App, services.Backend, services.Server, dsn, services.Schema)
 type Built struct {
-	Authn     router.Middleware     // who the caller is (session); nil without sign-in
-	Authorize model.Authorizer      // what the caller may do; denies everything without sign-in
-	Policy    model.PolicyDescriber // which role opens each resource (API explorer); nil when unknown
+	Authn     router.Middleware      // who the caller is (session); nil without sign-in
+	Authorize model.Authorizer       // what the caller may do; denies everything without sign-in
+	Policy    model.PolicyDescriber  // which role opens each resource (API explorer); nil when unknown
+	Report    securityevent.Reporter // where the HTTP gate reports a refused permission (httpd.Config.Report)
 
 	app     appkit.App
 	backend Backend
@@ -105,6 +108,9 @@ func Build(app appkit.App, b Backend, s Server, dsn string, schema ddl.Schema) (
 		StartCallExecutor(q, NewCallRunner(ops), d.DB, 5*time.Second, app.Log)
 	}
 	out.d, out.ops = d, ops
+	if out.Report, err = securityevent.New(b.Events); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -114,14 +120,13 @@ func (out *Built) entry(d *Deps, b Backend, s Server, ops *[]crud.Module) error 
 	for _, m := range b.Modules {
 		grants = append(grants, m.DefaultGrants...)
 	}
-	switch out.app.SignIn {
-	case 0:
+	hasSignIn := len(out.app.SignIn) > 0
+	if hasSignIn {
+		grants = append(grants, authority.DefaultGrants...)
+	} else {
 		out.app.Log(msgNoSignIn)
-	case appkit.SignInByTrustedIP:
-	default:
-		return appkit.ErrUnknownSignIn
 	}
-	if out.app.SignIn == 0 && len(grants) == 0 {
+	if !hasSignIn && len(grants) == 0 {
 		return nil
 	}
 	svc, err := rbac.New(d.DB)
@@ -133,10 +138,10 @@ func (out *Built) entry(d *Deps, b Backend, s Server, ops *[]crud.Module) error 
 			return err
 		}
 	}
-	if out.app.SignIn == 0 {
+	if !hasSignIn {
 		return nil
 	}
-	si, err := buildSignIn(*d, b.Events, svc, s.SessionIdleMinutes)
+	si, err := buildSignIn(*d, out.app.SignIn, b.Events, svc, s.SessionIdleMinutes)
 	if err != nil {
 		return err
 	}

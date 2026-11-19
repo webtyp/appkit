@@ -3,6 +3,7 @@
   "keys": {
     "Loading…": ["Cargando…", "加载中…", "लोड हो रहा है…", "جارٍ التحميل…", "Carregando…", "Chargement…", "Wird geladen…", "Загрузка…"],
     "Log out": ["Cerrar sesión", "退出登录", "लॉग आउट", "تسجيل الخروج", "Sair", "Se déconnecter", "Abmelden", "Выйти"],
+    "a serious security event happened": ["ocurrió un evento de seguridad grave", "发生了严重的安全事件", "एक गंभीर सुरक्षा घटना हुई", "وقع حدث أمني خطير", "ocorreu um evento de segurança grave", "un événement de sécurité grave s'est produit", "ein schwerwiegendes Sicherheitsereignis ist aufgetreten", "произошло серьёзное событие безопасности"],
     "appkit: Backend.API is nil — give it the transport that publishes the operations (rpc.JSON{})": ["", "", "", "", "", "", "", ""],
     "appkit: Backend.Events is nil — give it a broker (inprocess.Broker{})": ["", "", "", "", "", "", "", ""],
     "appkit: BuildModules got no database — pass the *orm.DB of the transaction the import runs in": ["", "", "", "", "", "", "", ""],
@@ -17,6 +18,8 @@
     "appkit: no module with that name is built — list it before the one that needs it in App.Modules": ["", "", "", "", "", "", "", ""],
     "appkit: unknown call func for call": ["", "", "", "", "", "", "", ""],
     "appkit: unknown call target for module": ["", "", "", "", "", "", "", ""],
-    "entity": ["", "", "", "", "", "", "", ""]
+    "does not support industry": ["", "", "", "", "", "", "", ""],
+    "entity": ["", "", "", "", "", "", "", ""],
+    "many failed sign-ins from one address: someone may be trying keys": ["muchos ingresos fallidos desde una misma dirección: alguien puede estar probando claves", "同一地址多次登录失败：可能有人在尝试密钥", "एक ही पते से कई असफल साइन-इन: कोई कुंजियाँ आज़मा रहा हो सकता है", "محاولات دخول فاشلة كثيرة من عنوان واحد: قد يكون أحدهم يجرّب المفاتيح", "muitas entradas falhas a partir de um mesmo endereço: alguém pode estar testando chaves", "nombreuses connexions échouées depuis une même adresse : quelqu'un essaie peut-être des clés", "viele fehlgeschlagene Anmeldungen von einer Adresse: jemand probiert womöglich Schlüssel aus", "много неудачных входов с одного адреса: возможно, кто-то подбирает ключи"]
   }
 }

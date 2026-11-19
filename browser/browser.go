@@ -3,6 +3,10 @@ package browser
 import (
 	"errors"
 
+	accessui "webtyp.com/access/ui"
+	"webtyp.com/auth/authority"
+	"webtyp.com/dom"
+
 	"webtyp.com/appkit"
 	"webtyp.com/fmt"
 	"webtyp.com/model"
@@ -47,8 +51,10 @@ func Run(app appkit.App, b Browser, layout view.Layout) {
 	select {}
 }
 
-// NewSession builds what a layout draws: the app's name, the connection to the server, the zone, the menu screens and
-// the sign-in screens.
+// NewSession builds what a layout draws: the app's name, the connection to the server, the zone, the menu screens,
+// who is signed in, the entry screens of the sign-in modes open at this door, and how to sign out. It never names a
+// mode, a route or an operation: each mode gives its own screen (view.EntryScreen) and authority answers who is signed
+// in (D75).
 //
 //	session, err := browser.NewSession(config.App, screens.Browser)
 func NewSession(app appkit.App, b Browser) (view.Session, error) {
@@ -58,12 +64,47 @@ func NewSession(app appkit.App, b Browser) (view.Session, error) {
 	}
 	records := view.NewRecords().Caller(b.Caller) // one page of records: what one saves the others see
 	d.Caller = records
-	screens := Screens(app, b, d)
-	entry, err := signInScreens(app, d)
-	if err != nil {
-		return view.Session{}, err
+	s := view.Session{Name: app.Name, Caller: b.Caller, Zone: d.Zone, Screens: Screens(app, b, d), Log: app.Log}
+	if len(app.SignIn) == 0 {
+		return s, nil
 	}
-	return view.Session{Name: app.Name, Caller: b.Caller, Zone: d.Zone, Screens: screens, Entry: entry, Log: app.Log}, nil
+	s.SignOut = func() { authority.SignOut(func() { dom.Navigate("") }) }
+	s.IdleSeconds = sessionIdleSeconds
+	me, ok, err := authority.ReadMe(b.Caller)
+	switch {
+	case err != nil:
+		s.ServerDown = true
+		return s, nil
+	case ok:
+		s.User = view.User{ID: me.Id, Name: me.Name, Avatar: me.Avatar, Grants: me.GrantList()}
+		return s, nil
+	}
+	for _, mode := range app.SignIn {
+		screen, ok := mode.(view.EntryScreen)
+		if !ok {
+			continue
+		}
+		entry, open, err := screen.EntryScreen(d)
+		if err != nil {
+			s.ServerDown = true
+			return s, nil
+		}
+		if open {
+			s.Entries = append(s.Entries, entry)
+		}
+	}
+	return s, nil
+}
+
+// sessionIdleSeconds locks an idle session.
+const sessionIdleSeconds = 30 * 60
+
+// signInMenu is the administration of users and roles the sign-in brings to the menu; none without sign-in.
+func signInMenu(app appkit.App, d view.BrowserDeps) []view.Screen {
+	if len(app.SignIn) == 0 {
+		return nil
+	}
+	return accessui.Screens(d.Caller)
 }
 
 // Screens are the menu's screens: the module administration of the sign-in first when the app has one, then each

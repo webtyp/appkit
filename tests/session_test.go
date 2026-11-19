@@ -7,6 +7,8 @@ import (
 
 	"webtyp.com/appkit"
 	"webtyp.com/appkit/browser"
+	"webtyp.com/auth"
+	"webtyp.com/auth/authority"
 	"webtyp.com/model"
 	"webtyp.com/router"
 	"webtyp.com/unixid"
@@ -17,10 +19,6 @@ type noCaller struct{}
 
 func (noCaller) Call(router.Operation, model.Encodable, model.Decodable, func(error)) {}
 func (noCaller) Dispatch(router.Operation, model.Encodable)                           {}
-
-type recordingLayout struct{ got view.Session }
-
-func (l *recordingLayout) Show(s view.Session) { l.got = s }
 
 func browserKit(mods ...browser.Module) (appkit.App, browser.Browser) {
 	app := appkit.App{Name: "acme", Timezone: "America/Santiago", Log: func(...any) {}}
@@ -101,7 +99,6 @@ func TestNewSession_WhatTheAppForgotIsNamed(t *testing.T) {
 		{"screens of an unlisted module", func(_ *appkit.App, b *browser.Browser) {
 			b.Modules = append(b.Modules, browser.Module{Name: "stray"})
 		}, browser.ErrUnlistedScreens},
-		{"unknown sign-in", func(a *appkit.App, _ *browser.Browser) { a.SignIn = 99 }, appkit.ErrUnknownSignIn},
 	}
 	for _, c := range cases {
 		app, b := browserKit(browser.Module{Name: "a"})
@@ -118,22 +115,49 @@ func TestNewSession_WithoutSignInThereAreNoEntryScreens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Entry.Login.Form != nil || s.Entry.Setup.Form != nil || len(s.Screens) != 1 {
+	if len(s.Entries) != 0 || s.SignOut != nil || len(s.Screens) != 1 {
 		t.Fatalf("no sign-in: no entry screens and no administration screens, got %+v", s)
 	}
 }
 
-func TestNewSession_SignInByTrustedIPBringsTheEntryAndTheAdministration(t *testing.T) {
+func TestNewSession_NobodySignedInGetsTheOpenModesScreensAndTheAdministration(t *testing.T) {
 	app, b := browserKit(browser.Module{Name: "a", Screens: screensOf("a1")})
-	app.SignIn = appkit.SignInByTrustedIP
+	app.SignIn = []auth.Mode{&fakeMode{}, &fakeMode{closed: true}}
+	b.Caller = meCaller{}
 	s, err := browser.NewSession(app, b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Entry.Login.Form == nil || s.Entry.Setup.Form == nil || s.Entry.IdleSeconds <= 0 {
-		t.Fatalf("sign-in must give the login and the first-setup screens: %+v", s.Entry)
+	if s.User.ID != "" || len(s.Entries) != 1 || s.SignOut == nil || s.IdleSeconds <= 0 {
+		t.Fatalf("nobody signed in: one entry per open mode, a way to sign out, an idle lock; got %+v", s)
 	}
 	if len(s.Screens) < 2 || s.Screens[0].ID != "access" || s.Screens[len(s.Screens)-1].ID != "a1" {
 		t.Fatalf("the administration of users and roles goes first, the app's screens after: %+v", s.Screens)
+	}
+}
+
+func TestNewSession_SignedInUserComesWithGrantsAndNoEntryScreens(t *testing.T) {
+	app, b := browserKit(browser.Module{Name: "a"})
+	app.SignIn = []auth.Mode{&fakeMode{}}
+	b.Caller = meCaller{me: &authority.Me{Id: "u1", Name: "Ana", Grants: []authority.MeGrant{{Resource: "patient", Actions: "r"}}}}
+	s, err := browser.NewSession(app, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.User.ID != "u1" || !s.User.Can("patient", model.Read) || len(s.Entries) != 0 {
+		t.Fatalf("a signed-in user: their id and grants, no entry screens; got %+v", s)
+	}
+}
+
+func TestNewSession_ServerDownIsNotTheEntryScreen(t *testing.T) {
+	app, b := browserKit(browser.Module{Name: "a"})
+	app.SignIn = []auth.Mode{&fakeMode{}}
+	b.Caller = meCaller{err: unreachableErr{}}
+	s, err := browser.NewSession(app, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.ServerDown || len(s.Entries) != 0 {
+		t.Fatalf("no answer from the server: ServerDown and no entry screen (D76); got %+v", s)
 	}
 }

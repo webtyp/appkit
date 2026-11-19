@@ -14,7 +14,7 @@ With appkit, the app declares `App` (what it is, its modules once), `Backend` (h
 |---|---|
 | `config/server.go`, `config/auth.go`, `config/client.go` | `App` + `Backend` + `Server` + `Browser` |
 | Every module listed for the server and again for the menu | `App.Modules`, once, in build order |
-| Login wiring written by hand | `App.SignIn: appkit.SignInByTrustedIP` |
+| Login wiring written by hand | `App.SignIn: []auth.Mode{trustedip.Mode{Devices: staffmanager.Definition}}` — each mode is a value; appkit builds it and never names it |
 | Adapters written by hand between modules | the module that provides exports a plain type; the app joins them with `FindBuiltModule` |
 
 ## Before You Start
@@ -32,7 +32,7 @@ With appkit, the app declares `App` (what it is, its modules once), `Backend` (h
 var App = appkit.App{
 	Name: "Acme", TenantID: "acme", Timezone: "America/Santiago",
 	Countries: country.Catalog{ /* the default country and which go first */ },
-	SignIn:    appkit.SignInByTrustedIP, // without it nobody enters and every operation is denied
+	SignIn:    []auth.Mode{passkey.Mode{Origin: "https://app.example.com"}}, // without modes nobody enters and every guarded operation is denied
 	Modules:   []model.ModuleDefinition{catalog.Definition, devices.Definition, staff.Definition},
 	Log:       log.Println, // required (ErrNoLog)
 }
@@ -84,7 +84,7 @@ err = built.Mount(srv.Router(), devtools.Server(services.Schema)...)
 ### Default grants and external calls
 
 What any signed-in person may do with a module is `backend.Module.DefaultGrants`, ensured at boot on `rbac.RoleAuthenticated` with the rbac that `appkit` builds itself.
-When entities declare `ExternalCalls`, `Build` creates the durable queue (`webtyp.com/externalcalls`), fills `Deps.Queue`, sets `crud.SetDefaultQueue` and starts the periodic executor. They need the `queued_call` table: add `externalcallsmigrate.Migrate` from `webtyp.com/externalcalls/migrate` to the migration steps.
+When entities declare `ExternalCalls`, `Build` creates the durable queue (`webtyp.com/externalcalls`), fills `Deps.Queue`, sets `crud.SetDefaultQueue` and starts the periodic executor. They need the `queued_call` table: the generated `config/services/migrations.go` always migrates it (`webtyp.com/externalcalls/migrate`), so the app writes nothing.
 
 ### Importing history
 
@@ -96,7 +96,7 @@ When entities declare `ExternalCalls`, `Build` creates the durable queue (`webty
 |---|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Design and decisions |
 | [`docs/TESTS.md`](docs/TESTS.md) | Test suite inventory |
-| [`app.go`](app.go) | `App`, `SignInMethod` |
+| [`app.go`](app.go) | `App` (its `SignIn` lists `auth.Mode` values) |
 | [`backend/backend.go`](backend/backend.go) | `Backend`, `Module`, `Server`, `API`, `Agents`, `Deps`, `FindBuiltModule` |
 | [`backend/build.go`](backend/build.go) | `Build`, `Built.Mount`, `BuildModules` |
 | [`backend/signin.go`](backend/signin.go) / [`browser/signin.go`](browser/signin.go) | The sign-in by trusted IP, server and screens |

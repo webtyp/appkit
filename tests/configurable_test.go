@@ -8,6 +8,7 @@ import (
 
 	"webtyp.com/appkit"
 	"webtyp.com/appkit/backend"
+	"webtyp.com/auth"
 	"webtyp.com/ddl"
 	"webtyp.com/events/inprocess"
 	"webtyp.com/model"
@@ -66,7 +67,7 @@ func TestBuild_EnsuresAppRolesAndModuleUseGrants(t *testing.T) {
 		TenantID: "clinic",
 		Timezone: "UTC",
 		Industry: model.IndustryHumanHealth,
-		SignIn:   appkit.SignInByTrustedIP,
+		SignIn:   []auth.Mode{&fakeMode{}},
 		Roles: []model.Role{
 			{Code: "reception", Name: "Reception", Use: model.WorksWithAllRecords},
 		},

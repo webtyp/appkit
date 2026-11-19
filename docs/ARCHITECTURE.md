@@ -23,7 +23,7 @@ flowchart TD
 
 | File | Package / Tag | Responsibility |
 |---|---|---|
-| [`app.go`](../app.go) | `appkit` | `App`, `SignInMethod`, shared errors |
+| [`app.go`](../app.go) | `appkit` | `App` (its `SignIn` lists `auth.Mode` values), shared errors |
 | [`backend/backend.go`](../backend/backend.go) | `appkit/backend` | `Backend`, `Module`, `Server`, `API`, `Agents`, `Parts`, `Deps`, `FindBuiltModule` |
 | [`backend/build.go`](../backend/build.go) | `appkit/backend` | `Build`, `Built.Mount`, `BuildModules`, leftovers check |
 | [`backend/signin.go`](../backend/signin.go) | `appkit/backend` | The sign-in by trusted IP: users, roles, first administrator, rate limit |

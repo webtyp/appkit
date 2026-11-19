@@ -6,10 +6,12 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	trustedip "webtyp.com/auth/trusted_ip"
 
 	"webtyp.com/appkit"
 	"webtyp.com/appkit/backend"
 	"webtyp.com/auth"
+	"webtyp.com/auth/authority"
 	"webtyp.com/crud"
 	"webtyp.com/ddl"
 	"webtyp.com/events/inprocess"
@@ -204,7 +206,6 @@ func TestBuild_WhatTheAppForgotIsNamed(t *testing.T) {
 		{"no ids", func(_ *appkit.App, _ *backend.Backend, s *backend.Server) { s.NewIDs = nil }, backend.ErrNoIDs},
 		{"no database driver", func(_ *appkit.App, _ *backend.Backend, s *backend.Server) { s.Database = nil }, backend.ErrNoOpen},
 		{"bad timezone", func(a *appkit.App, _ *backend.Backend, _ *backend.Server) { a.Timezone = "Mars/Base" }, appkit.ErrNoTimezone},
-		{"unknown sign-in", func(a *appkit.App, _ *backend.Backend, _ *backend.Server) { a.SignIn = 99 }, appkit.ErrUnknownSignIn},
 	}
 	for _, c := range cases {
 		app, b, s := kit(part("a", returns(namedMod{"a"})))
@@ -243,15 +244,51 @@ func TestBuild_NoSignInSaysSo(t *testing.T) {
 	}
 }
 
-func TestBuild_SignInByTrustedIPGivesTheSessionAndTheRoles(t *testing.T) {
+func TestBuild_SignInGivesTheSessionAndTheRoles(t *testing.T) {
 	app, b, s := kit(part("a", returns(namedMod{"a"})))
-	app.SignIn = appkit.SignInByTrustedIP
+	app.SignIn = []auth.Mode{&fakeMode{}}
 	got := build(t, app, b, s)
 	if got.Authn == nil || got.Authorize == nil {
 		t.Fatalf("sign-in must give Authn and Authorize: %+v", got)
 	}
 	if got.Authorize("nobody", "fake", model.Read) {
 		t.Fatal("a person with no role may do nothing")
+	}
+}
+
+func TestBuild_ModesGetThePiecesAndMakeAdminGivesTheRole(t *testing.T) {
+	mode := &fakeMode{}
+	app, b, s := kit(part("a", returns(namedMod{"a"})))
+	app.SignIn = []auth.Mode{mode}
+	build(t, app, b, s)
+	p := mode.ports
+	if p == nil || p.Identities == nil || p.MakeAdmin == nil || p.HasAdmin == nil || p.Built == nil {
+		t.Fatalf("appkit must build each mode with every piece, got %+v", p)
+	}
+	if has, err := p.HasAdmin(); err != nil || has {
+		t.Fatalf("a new install has no administrator: has %v err %v", has, err)
+	}
+	u, err := p.Identities.CreateUser("", "Ana", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.MakeAdmin(u.Id); err != nil {
+		t.Fatalf("MakeAdmin: %v", err)
+	}
+	if has, err := p.HasAdmin(); err != nil || !has {
+		t.Fatalf("after MakeAdmin there is an administrator: has %v err %v", has, err)
+	}
+	if found, err := p.Built(model.ModuleDefinition{Name: "a"}); err != nil || found.ModelName() != "a" {
+		t.Fatalf("Built must find the app's module: %v %v", found, err)
+	}
+}
+
+func TestBuild_AModeThatCannotBeBuiltStopsTheStart(t *testing.T) {
+	want := errors.New("mode refused")
+	app, b, s := kit(part("a", returns(namedMod{"a"})))
+	app.SignIn = []auth.Mode{&fakeMode{buildErr: want}}
+	if _, err := backend.Build(app, b, s, "mem", ddl.Schema{}); !errors.Is(err, want) {
+		t.Fatalf("a mode that cannot be built must stop the start, got %v", err)
 	}
 }
 
@@ -468,18 +505,15 @@ func linesWith(lines []string, part string) []string {
 	return out
 }
 
-func TestMount_SignInBringsItsOwnRoutes(t *testing.T) {
+func TestMount_EachModeBringsItsOwnRoutes(t *testing.T) {
 	app, b, s := fakeKit()
-	app.SignIn = appkit.SignInByTrustedIP
+	app.SignIn = []auth.Mode{&fakeMode{}}
 	r, err := mounted(t, app, b, s, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status, _ := get(r, auth.PathMe); status == 404 {
-		t.Fatalf("GET %s: the sign-in must mount it, got 404", auth.PathMe)
-	}
-	if !hasRoute(r, "POST", auth.PathLoginRUT) || !hasRoute(r, "POST", auth.PathLogout) {
-		t.Fatalf("the sign-in must mount %s and %s", auth.PathLoginRUT, auth.PathLogout)
+	if !hasRoute(r, "POST", pathFakeLogin) || !hasRoute(r, "POST", auth.PathLogout) {
+		t.Fatalf("the sign-in must mount the mode's %s and the shared %s", pathFakeLogin, auth.PathLogout)
 	}
 }
 
@@ -489,12 +523,40 @@ func TestMount_WithoutSignInThereAreNoSessionRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hasRoute(r, "POST", auth.PathLoginRUT) {
-		t.Fatalf("an app without SignIn must not offer %s", auth.PathLoginRUT)
+	if hasRoute(r, "POST", auth.PathLogout) {
+		t.Fatalf("an app without SignIn must not offer %s", auth.PathLogout)
 	}
 }
 
 // hasRoute says whether the router registered a route with that method and path.
+// TestMount_EverySignedInPersonReadsMe walks who-am-I as the browser does: the crud read user/me through rpc, with the
+// real permission appkit builds (rbac). Anyone with a session passes the permission; without a session it is refused.
+func TestMount_EverySignedInPersonReadsMe(t *testing.T) {
+	app, b, s := fakeKit()
+	app.SignIn = []auth.Mode{&fakeMode{}}
+	built := build(t, app, b, s)
+	path := rpc.DefaultPrefix + "/user/me"
+
+	signedIn := &mock.Router{}
+	signedIn.Configure(mock.Config{Authn: fakeAuthn("no-such-user"), Authorize: built.Authorize})
+	if err := built.Mount(signedIn); err != nil {
+		t.Fatal(err)
+	}
+	// The session points at a user that does not exist: passing the permission reaches the rule, which says so.
+	if status, body := get(signedIn, path); status != 404 || !strings.Contains(body, string(authority.ErrSignedInUserNotFound)) {
+		t.Fatalf("a signed-in person must pass the permission of me and reach its rule, got %d (%s)", status, body)
+	}
+
+	anonymous := &mock.Router{}
+	anonymous.Configure(mock.Config{Authorize: built.Authorize})
+	if err := built.Mount(anonymous); err != nil {
+		t.Fatal(err)
+	}
+	if status, body := get(anonymous, path); status != 403 && status != 401 {
+		t.Fatalf("without a session me must be refused, got %d (%s)", status, body)
+	}
+}
+
 func hasRoute(r *mock.Router, method, path string) bool {
 	for _, info := range r.Routes() {
 		if info.Method == method && info.Path == path {
@@ -532,10 +594,12 @@ func fromLAN(r *mock.Router, path, ip, body string) int {
 	return ctx.Status
 }
 
-func TestBuild_SignInUsesTheStaffRegister(t *testing.T) {
+// TestBuild_TrustedIPModeUsesTheAppsRegister walks the real trusted_ip mode through appkit: appkit only hands it the
+// pieces (Built finds the register, MakeAdmin gives the role); the mode does the rest.
+func TestBuild_TrustedIPModeUsesTheAppsRegister(t *testing.T) {
 	staff := &staffRegister{namedMod: namedMod{"staff"}}
 	app, b, s := kit(part("staff", returns(staff)))
-	app.SignIn = appkit.SignInByTrustedIP
+	app.SignIn = []auth.Mode{trustedip.Mode{Devices: model.ModuleDefinition{Name: "staff"}}}
 	r, err := mounted(t, app, b, s, nil)
 	if err != nil {
 		t.Fatal(err)
