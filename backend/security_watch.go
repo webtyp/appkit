@@ -43,8 +43,10 @@ type ipFailures struct {
 // watchSecurity listens to every security event on broker: it logs them and raises the alerts.
 func watchSecurity(broker events.Broker, logger func(...any)) error {
 	w := &securityWatch{alerts: broker, log: logger}
-	_, err := securityevent.Listen(broker, w.handle)
-	return err
+	if _, err := securityevent.Listen(broker, w.handle); err != nil {
+		return err
+	}
+	return attachCriticalFileLog(broker, logger)
 }
 
 func (w *securityWatch) handle(e securityevent.Event) {

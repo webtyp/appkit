@@ -17,7 +17,7 @@ require (
 	webtyp.com/mcp v0.3.36
 	webtyp.com/model v0.2.26
 	webtyp.com/msgtype v0.1.2
-	webtyp.com/notify v0.2.18
+	webtyp.com/notify v0.2.19
 	webtyp.com/orm v0.12.42
 	webtyp.com/rbac v0.0.48
 	webtyp.com/router v0.5.7
