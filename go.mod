@@ -4,7 +4,7 @@ go 1.26.8
 
 require (
 	webtyp.com/access v0.0.72
-	webtyp.com/auth v0.0.126
+	webtyp.com/auth v0.0.127
 	webtyp.com/backoff v0.2.0
 	webtyp.com/country v0.0.2
 	webtyp.com/crud v0.0.19
