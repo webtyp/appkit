@@ -20,7 +20,7 @@ require (
 	webtyp.com/notify v0.2.19
 	webtyp.com/orm v0.12.42
 	webtyp.com/rbac v0.0.48
-	webtyp.com/router v0.5.7
+	webtyp.com/router v0.5.9
 	webtyp.com/rpc v0.2.30
 	webtyp.com/securityevent v0.0.2
 	webtyp.com/sqlite v0.3.35
