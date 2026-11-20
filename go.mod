@@ -59,7 +59,7 @@ require (
 	webtyp.com/filepath v0.1.3 // indirect
 	webtyp.com/filetype v0.1.1 // indirect
 	webtyp.com/font v0.0.5 // indirect
-	webtyp.com/form v0.4.68 // indirect
+	webtyp.com/form v0.4.72 // indirect
 	webtyp.com/icons v0.0.42 // indirect
 	webtyp.com/input v0.2.5 // indirect
 	webtyp.com/json v0.5.40 // indirect
