@@ -14,6 +14,10 @@ var (
 	ErrUnsupportedIndustry = errors.New("appkit: module does not support the application's industry")
 )
 
+// NoticesPath is where the server streams each signed-in user's notices (sse.UserNotices) and where the browser
+// listens to them (view.BrowserDeps.Notices).
+const NoticesPath = "/notices"
+
 // App is the whole application, the same value for the server, the Worker and the browser: web/server, web/edge and
 // web/browser read it. What differs by platform lives in Backend, Server and Browser.
 //

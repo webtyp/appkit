@@ -74,17 +74,28 @@ type Parts interface {
 	Parts() []model.ModuleNaming
 }
 
+// Notifier sends a notice with no data to every browser where a user is signed in (sse.UserNotices). The screen
+// that listens reads what changed through its caller. A module declares its own one-method interface and the app
+// passes Deps.Notices to it.
+//
+//	d.Notices.Notify(userID, clinicalencounter.AgendaChanged)
+type Notifier interface {
+	Notify(userID, topic string)
+}
+
 // Deps is what every module gets from appkit: the database, ids, events, the installation's tenant and time zone,
 // and FindBuiltModule over the modules built before it.
 type Deps struct {
-	DB        *orm.DB
-	IDs       model.IDGenerator
-	Events    events.Publisher
-	TenantID  string
-	Zone      time.Zone       // the installation's zone (App.Timezone), loaded once: every local date and hour comes from it
-	Countries country.Catalog // the installation's countries (App.Countries): the default country and which come first
-	Log       func(...any)    // the app's log (App.Log); never nil
-	Queue     crud.CallQueue
+	DB         *orm.DB
+	IDs        model.IDGenerator
+	Events     events.Publisher  // publishes the notices between modules (Backend.Events)
+	Subscriber events.Subscriber // listens to the notices between modules: the same broker as Events
+	Notices    Notifier          // notices to the browsers of a signed-in user; nil when the app has no sign-in
+	TenantID   string
+	Zone       time.Zone       // the installation's zone (App.Timezone), loaded once: every local date and hour comes from it
+	Countries  country.Catalog // the installation's countries (App.Countries): the default country and which come first
+	Log        func(...any)    // the app's log (App.Log); never nil
+	Queue      crud.CallQueue
 
 	built *[]builtModule
 }

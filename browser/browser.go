@@ -26,9 +26,10 @@ var (
 //
 //	var Browser = browser.Browser{Caller: rpc.NewCaller(""), NewIDs: newIDs, Modules: []browser.Module{{Name: catalog.Definition.Name, Screens: catalogui.Screens}}}
 type Browser struct {
-	Caller  router.Caller                     // how the browser talks to the server
-	NewIDs  func() (model.IDGenerator, error) // how ids are created in the browser
-	Modules []Module                          // the screens of each module of App.Modules, found by Name
+	Caller       router.Caller                     // how the browser talks to the server
+	NewIDs       func() (model.IDGenerator, error) // how ids are created in the browser
+	Modules      []Module                          // the screens of each module of App.Modules, found by Name
+	GroupScreens func([]view.Screen) []view.Screen // optional: reorganizes the final menu screens into app-defined groups
 }
 
 // Module is the screens of one module. Name is the module's Definition.Name; Screens nil = a module with no screen.
@@ -64,8 +65,9 @@ func NewSession(app appkit.App, b Browser) (view.Session, error) {
 	}
 	records := view.NewRecords().Caller(b.Caller) // one page of records: what one saves the others see
 	d.Caller = records
-	s := view.Session{Name: app.Name, Caller: b.Caller, Zone: d.Zone, Screens: Screens(app, b, d), Log: app.Log}
+	s := view.Session{Name: app.Name, Caller: b.Caller, Zone: d.Zone, Log: app.Log}
 	if len(app.SignIn) == 0 {
+		s.Screens = Screens(app, b, d)
 		return s, nil
 	}
 	s.SignOut = func() { authority.SignOut(func() { dom.Navigate("") }) }
@@ -74,11 +76,15 @@ func NewSession(app appkit.App, b Browser) (view.Session, error) {
 	switch {
 	case err != nil:
 		s.ServerDown = true
+		s.Screens = Screens(app, b, d)
 		return s, nil
 	case ok:
 		s.User = view.User{ID: me.Id, Name: me.Name, Avatar: me.Avatar, Grants: me.GrantList()}
+		d.Notices = connectNotices() // only a signed-in user has notices: the screens are built after, with them
+		s.Screens = Screens(app, b, d)
 		return s, nil
 	}
+	s.Screens = Screens(app, b, d)
 	for _, mode := range app.SignIn {
 		screen, ok := mode.(view.EntryScreen)
 		if !ok {
@@ -117,6 +123,9 @@ func Screens(app appkit.App, b Browser, d view.BrowserDeps) []view.Screen {
 				out = append(out, m.Screens(d)...)
 			}
 		}
+	}
+	if b.GroupScreens != nil {
+		return b.GroupScreens(out)
 	}
 	return out
 }

@@ -67,8 +67,14 @@ func Build(app appkit.App, b Backend, s Server, dsn string, schema ddl.Schema) (
 	if err != nil {
 		return nil, appkit.ErrNoTimezone
 	}
-	d := Deps{IDs: ids, Events: b.Events, TenantID: app.TenantID, Zone: zone, Countries: app.Countries, Log: app.Log}
+	d := Deps{IDs: ids, Events: b.Events, Subscriber: b.Events, TenantID: app.TenantID, Zone: zone, Countries: app.Countries, Log: app.Log}
 	out := &Built{app: app, backend: b, Authorize: DenyAll(app.Log)}
+	if len(app.SignIn) > 0 {
+		if notices, route := userNotices(); notices != nil {
+			d.Notices = notices
+			out.api = append(out.api, route)
+		}
+	}
 
 	if dsn == "" {
 		app.Log(msgNoDatabase)
@@ -290,7 +296,7 @@ func BuildModules(app appkit.App, b Backend, s Server, db *orm.DB) (Deps, error)
 	if err != nil {
 		return Deps{}, err
 	}
-	d := Deps{DB: db, IDs: ids, Events: b.Events, TenantID: app.TenantID, Zone: zone, Countries: app.Countries, Log: app.Log, Queue: NewCallQueue(q)}
+	d := Deps{DB: db, IDs: ids, Events: b.Events, Subscriber: b.Events, TenantID: app.TenantID, Zone: zone, Countries: app.Countries, Log: app.Log, Queue: NewCallQueue(q)}
 	if _, err := buildModules(app, b, &d); err != nil {
 		return Deps{}, err
 	}

@@ -27,7 +27,7 @@ require (
 	webtyp.com/storage v0.2.8
 	webtyp.com/time v0.6.7
 	webtyp.com/unixid v0.3.1
-	webtyp.com/view v0.6.91
+	webtyp.com/view v0.6.94
 )
 
 require (
@@ -65,6 +65,7 @@ require (
 	webtyp.com/json v0.5.40 // indirect
 	webtyp.com/keyring v0.2.9 // indirect
 	webtyp.com/sqlt v0.0.21 // indirect
+	webtyp.com/sse v0.2.60
 	webtyp.com/svg v0.3.43 // indirect
 	webtyp.com/user v0.3.14 // indirect
 	webtyp.com/webauthn v0.1.16 // indirect
