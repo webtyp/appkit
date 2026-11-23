@@ -70,6 +70,7 @@ func Build(app appkit.App, b Backend, s Server, dsn string, schema ddl.Schema) (
 	d := Deps{IDs: ids, Events: b.Events, Subscriber: b.Events, TenantID: app.TenantID, Zone: zone, Countries: app.Countries, Log: app.Log}
 	out := &Built{app: app, backend: b, Authorize: DenyAll(app.Log)}
 	if len(app.SignIn) > 0 {
+		d.SignInAccounts = &lateAccounts{}
 		if notices, route := userNotices(); notices != nil {
 			d.Notices = notices
 			out.api = append(out.api, route)

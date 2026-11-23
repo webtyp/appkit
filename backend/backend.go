@@ -83,6 +83,15 @@ type Notifier interface {
 	Notify(userID, topic string)
 }
 
+// SignInAccounts gives a person the account they sign in with, from the credential the app's sign-in uses (a RUT
+// with trusted_ip): a staff module calls it when a professional is saved, so the person can sign in without a
+// second form. appkit passes Deps.SignInAccounts to it.
+//
+//	userID, err := d.SignInAccounts.GiveSignIn("8.123.456-6", "Dra. Ana Rojas")
+type SignInAccounts interface {
+	GiveSignIn(credential, name string) (userID string, err error)
+}
+
 // Deps is what every module gets from appkit: the database, ids, events, the installation's tenant and time zone,
 // and FindBuiltModule over the modules built before it.
 type Deps struct {
@@ -91,6 +100,9 @@ type Deps struct {
 	Events     events.Publisher  // publishes the notices between modules (Backend.Events)
 	Subscriber events.Subscriber // listens to the notices between modules: the same broker as Events
 	Notices    Notifier          // notices to the browsers of a signed-in user; nil when the app has no sign-in
+	// SignInAccounts gives a person their sign-in account; nil when the app has no sign-in. It answers once the
+	// sign-in is built (after the modules): a module calls it from an operation, never while being built.
+	SignInAccounts SignInAccounts
 	TenantID   string
 	Zone       time.Zone       // the installation's zone (App.Timezone), loaded once: every local date and hour comes from it
 	Countries  country.Catalog // the installation's countries (App.Countries): the default country and which come first

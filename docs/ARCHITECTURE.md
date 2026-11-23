@@ -47,7 +47,7 @@ flowchart TD
 
 ### Browser
 
-`NewSession` checks the parts (`Browser.Modules`), makes the ids, wraps `Browser.Caller` in `view.NewRecords()` so every screen shares one record cache, and collects the screens in `App.Modules` order (the users and roles administration first when there is a sign-in) and the entry screens.
+`NewSession` checks the parts (`Browser.Modules`), makes the ids, wraps `Browser.Caller` in `view.NewRecords()` so every screen shares one record cache, and collects the screens in `App.Modules` order (the users and roles administration first when there is a sign-in) — or, when the app sets `Browser.Menu`, in its `MenuGroup`s in the order written (a screen unknown, repeated or left out is an error at start) and the entry screens.
 
 ## 4. Boundaries
 

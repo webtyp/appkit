@@ -29,7 +29,7 @@ type Browser struct {
 	Caller       router.Caller                     // how the browser talks to the server
 	NewIDs       func() (model.IDGenerator, error) // how ids are created in the browser
 	Modules      []Module                          // the screens of each module of App.Modules, found by Name
-	GroupScreens func([]view.Screen) []view.Screen // optional: reorganizes the final menu screens into app-defined groups
+	Menu         []MenuGroup                       // optional: the menu's groups and the order of their screens; nil = one group per module
 }
 
 // Module is the screens of one module. Name is the module's Definition.Name; Screens nil = a module with no screen.
@@ -63,12 +63,13 @@ func NewSession(app appkit.App, b Browser) (view.Session, error) {
 	if err != nil {
 		return view.Session{}, err
 	}
+
 	records := view.NewRecords().Caller(b.Caller) // one page of records: what one saves the others see
 	d.Caller = records
 	s := view.Session{Name: app.Name, Caller: b.Caller, Zone: d.Zone, Log: app.Log}
 	if len(app.SignIn) == 0 {
-		s.Screens = Screens(app, b, d)
-		return s, nil
+		s.Screens, err = Screens(app, b, d)
+		return s, err
 	}
 	s.SignOut = func() { authority.SignOut(func() { dom.Navigate("") }) }
 	s.IdleSeconds = sessionIdleSeconds
@@ -76,15 +77,18 @@ func NewSession(app appkit.App, b Browser) (view.Session, error) {
 	switch {
 	case err != nil:
 		s.ServerDown = true
-		s.Screens = Screens(app, b, d)
-		return s, nil
+		s.Screens, err = Screens(app, b, d)
+		return s, err
 	case ok:
 		s.User = view.User{ID: me.Id, Name: me.Name, Avatar: me.Avatar, Grants: me.GrantList()}
 		d.Notices = connectNotices() // only a signed-in user has notices: the screens are built after, with them
-		s.Screens = Screens(app, b, d)
-		return s, nil
+		s.Screens, err = Screens(app, b, d)
+		return s, err
 	}
-	s.Screens = Screens(app, b, d)
+	s.Screens, err = Screens(app, b, d)
+	if err != nil {
+		return s, err
+	}
 	for _, mode := range app.SignIn {
 		screen, ok := mode.(view.EntryScreen)
 		if !ok {
@@ -113,9 +117,10 @@ func signInMenu(app appkit.App, d view.BrowserDeps) []view.Screen {
 	return accessui.Screens(d.Caller)
 }
 
-// Screens are the menu's screens: the module administration of the sign-in first when the app has one, then each
-// module's in App.Modules order (the first one opens first).
-func Screens(app appkit.App, b Browser, d view.BrowserDeps) []view.Screen {
+// Screens are the menu's screens: with Browser.Menu, its groups in the order written; without it, the module
+// administration of the sign-in first when the app has one, then each module's in App.Modules order (the first one
+// opens first). A Menu that lists an unknown or repeated screen, or leaves one out, is an error.
+func Screens(app appkit.App, b Browser, d view.BrowserDeps) ([]view.Screen, error) {
 	out := signInMenu(app, d)
 	for _, def := range app.Modules {
 		for _, m := range b.Modules {
@@ -124,10 +129,10 @@ func Screens(app appkit.App, b Browser, d view.BrowserDeps) []view.Screen {
 			}
 		}
 	}
-	if b.GroupScreens != nil {
-		return b.GroupScreens(out)
+	if b.Menu != nil {
+		return groupMenu(out, b.Menu)
 	}
-	return out
+	return out, nil
 }
 
 func browserDeps(app appkit.App, b Browser) (view.BrowserDeps, error) {

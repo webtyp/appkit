@@ -95,6 +95,11 @@ func buildSignIn(d Deps, modes []auth.Mode, broker events.Broker, rbacSvc *rbac.
 			return nil, err
 		}
 		users.Enable(a)
+		if giver, ok := a.(auth.GivesSignIn); ok {
+			if late, ok := d.SignInAccounts.(*lateAccounts); ok && late.giver == nil {
+				late.giver = giver
+			}
+		}
 	}
 
 	switch exists, err := ports.HasAdmin(); {

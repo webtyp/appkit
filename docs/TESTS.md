@@ -21,6 +21,7 @@
 | [TestBuild_WithoutAddressBuildsNothingAndDeniesAll](../tests/kit_test.go) | without a database address no module is built and everything is denied |
 | [TestBuild_NoSignInSaysSo](../tests/kit_test.go) | without App.SignIn the log says nobody can enter and every operation is denied |
 | [TestBuild_SignInGivesTheSessionAndTheRoles](../tests/kit_test.go) | a chosen sign-in mode gives Authn and an Authorize that refuses a person with no role |
+| [TestSignInAccounts_ReachTheModeAfterBuild](../tests/sign_in_accounts_test.go) | a module built before the sign-in gives accounts through the mode that can (auth.GivesSignIn); with none it answers ErrNoAccountGiver |
 | [TestBuild_ModesGetThePiecesAndMakeAdminGivesTheRole](../tests/kit_test.go) | each mode is built with every piece (identities, MakeAdmin, HasAdmin, Built); MakeAdmin makes HasAdmin true; Built finds the app's module |
 | [TestBuild_AModeThatCannotBeBuiltStopsTheStart](../tests/kit_test.go) | a mode whose Build fails stops Build with that error |
 | [TestBuild_DefaultGrantsGoToTheAuthenticatedRole](../tests/kit_test.go) | DefaultGrants of the modules are ensured on the authenticated role with appkit's own rbac |
@@ -43,6 +44,8 @@
 | [TestNewSession_CarriesWhatTheAppIs](../tests/session_test.go) | NewSession gives the layout the name, caller, zone, log and the screens in App.Modules order |
 | [TestNewSession_ScreensGetZoneIdsAndCountries](../tests/session_test.go) | every module's screens get the zone, the ids and the caller in view.BrowserDeps |
 | [TestNewSession_ScreensShareOnePageOfRecords](../tests/session_test.go) | every module gets the same records caller |
+| [TestMenu_OrderIsTheOrderWritten](../tests/menu_test.go) | Browser.Menu shows its groups and the screens inside them in the order written |
+| [TestMenu_WrongMenuStopsTheApp](../tests/menu_test.go) | a Menu that names an unknown or repeated screen, leaves one out, or has an empty group fails NewSession |
 | [TestNewSession_WhatTheAppForgotIsNamed](../tests/session_test.go) | a missing log, caller, ids, zone, screens part or unlisted part is a named error |
 | [TestNewSession_WithoutSignInThereAreNoEntryScreens](../tests/session_test.go) | without App.SignIn there are no entry screens, no sign-out and no administration screens |
 | [TestNewSession_NobodySignedInGetsTheOpenModesScreensAndTheAdministration](../tests/session_test.go) | nobody signed in: one entry screen per mode open at this door, SignOut, an idle lock, and the users and roles administration first |
